@@ -312,6 +312,8 @@ const creteMantineTheme = (scale = 1) =>
     fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     fontFamilyMonospace: "source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace",
     primaryColor: 'chatbox-brand',
+    // Override Mantine's default body background with our warm CSS variable
+    other: {},
     colors: {
       'chatbox-brand': colorsTuple(Array.from({ length: 10 }, () => 'var(--chatbox-tint-brand)')),
       'chatbox-gray': colorsTuple(Array.from({ length: 10 }, () => 'var(--chatbox-tint-gray)')),
@@ -590,6 +592,17 @@ export const Route = createRootRoute({
       <MantineProvider
         theme={mantineTheme}
         defaultColorScheme={_theme === Theme.Dark ? 'dark' : _theme === Theme.Light ? 'light' : 'auto'}
+        cssVariablesResolver={(theme) => ({
+          variables: {},
+          light: {
+            '--mantine-color-body': '#FFF8F0',
+            '--mantine-color-default-color': '#3D2B1F',
+          },
+          dark: {
+            '--mantine-color-body': '#1E1410',
+            '--mantine-color-default-color': '#F5EDE0',
+          },
+        })}
       >
         <ThemeProvider theme={theme}>
           <CssBaseline />
