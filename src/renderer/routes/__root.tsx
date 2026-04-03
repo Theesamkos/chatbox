@@ -155,8 +155,17 @@ function Root() {
         .catch(() => ({ setting_chatboxai_first: false }) as RemoteConfig)
       setRemoteConfig(async (prev) => ({ ...(await prev), ...remoteConfig }))
 
-      // Skip guide-related checks if already on guide or settings/mcp page
-      if (location.pathname === '/guide' || location.pathname === '/settings/mcp') {
+      // Skip guide-related checks if already on a specific feature page.
+      // This prevents the onboarding redirect from overriding direct navigation
+      // to routes like /k12, /copilots, /guide, /settings/mcp, etc.
+      const isOnSpecificRoute =
+        location.pathname === '/guide' ||
+        location.pathname === '/settings/mcp' ||
+        location.pathname.startsWith('/k12') ||
+        location.pathname.startsWith('/copilots') ||
+        location.pathname.startsWith('/session/') ||
+        location.pathname.startsWith('/task')
+      if (isOnSpecificRoute) {
         initialized.current = true
         return
       }
