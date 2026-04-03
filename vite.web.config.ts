@@ -7,9 +7,6 @@ import react from '@vitejs/plugin-react'
 import path, { resolve } from 'path'
 import { defineConfig, type Plugin } from 'vite'
 import { visualizer } from 'rollup-plugin-visualizer'
-import packageJson from './release/app/package.json'
-
-const inferredRelease = process.env.SENTRY_RELEASE || packageJson.version
 
 /** Inject <base href="/"> so SPA routes resolve correctly */
 function injectBaseTag(): Plugin {
@@ -44,30 +41,33 @@ function dvhToVh(): Plugin {
     name: 'dvh-to-vh',
     transform(code, id) {
       if (id.endsWith('.css') || id.endsWith('.module.css')) {
-        return code.replace(/dvh/g, 'vh')
+        return { code: code.replace(/dvh/g, 'vh') }
       }
     },
   }
 }
 
+const rendererDir = resolve(__dirname, 'src/renderer')
+
 export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
-    root: resolve(__dirname, 'src/renderer'),
+    // No custom root — keep it at project root so all paths resolve correctly
     base: '/',
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, 'src/renderer'),
-        '@shared': path.resolve(__dirname, 'src/shared'),
+        '@': rendererDir,
+        '@shared': resolve(__dirname, 'src/shared'),
       },
     },
     plugins: [
       TanStackRouterVite({
         target: 'react',
         autoCodeSplitting: true,
-        routesDirectory: './routes',
-        generatedRouteTree: './routeTree.gen.ts',
+        // Use absolute paths so Vercel can find them regardless of cwd
+        routesDirectory: resolve(__dirname, 'src/renderer/routes'),
+        generatedRouteTree: resolve(__dirname, 'src/renderer/routeTree.gen.ts'),
       }),
       react({}),
       dvhToVh(),
