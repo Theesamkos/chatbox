@@ -212,6 +212,11 @@ function Root() {
 
   useEffect(() => {
     ;(() => {
+      // Only auto-navigate to last session when starting from root path.
+      // If the user navigated directly to a specific route (e.g. /k12, /copilots),
+      // respect that intent and do NOT override it with the startup redirect.
+      const currentPath = window.location.pathname
+      if (currentPath !== '/' && currentPath !== '') return
       const { startupPage } = settingsStore.getState()
       const sid = JSON.parse(localStorage.getItem('_currentSessionIdCachedAtom') || '""') as string
       if (sid && startupPage === 'session') {
