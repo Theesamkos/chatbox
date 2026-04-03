@@ -14,7 +14,6 @@ import { Badge, Box, Button, Card, Flex, Grid, Stack, Text, Title } from '@manti
 import { IconBrain, IconChessBishop, IconClock, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { createEmpty } from '@/stores/sessionActions'
-import { settingsStore } from '@/stores/settingsStore'
 
 // @ts-ignore — route will be registered in routeTree after pnpm dev regenerates
 export const Route = createFileRoute('/k12' as never)({
@@ -66,12 +65,11 @@ function K12Dashboard() {
 
   const handleLaunchPlugin = async (plugin: PluginCard) => {
     // Create a new chat session and navigate to it with the plugin pre-selected
-    const settings = settingsStore.getState().getSettings()
-    const sessionId = await createEmpty('chat')
+    const session = await createEmpty('chat')
+    const sessionId = session.id
     navigate({
       to: '/session/$sessionId',
       params: { sessionId },
-      search: { k12Plugin: plugin.id, k12QuickStart: plugin.quickStart },
     })
   }
 
