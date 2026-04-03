@@ -80,7 +80,7 @@ export default defineConfig(({ mode }) => {
       }),
     ].filter(Boolean),
     build: {
-      outDir: resolve(__dirname, 'release/app/dist/renderer'),
+      outDir: resolve(__dirname, 'dist'),
       emptyOutDir: true,
       target: 'es2020',
       sourcemap: isProduction ? 'hidden' : true,
