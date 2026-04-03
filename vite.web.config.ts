@@ -53,7 +53,8 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production'
 
   return {
-    // No custom root — keep it at project root so all paths resolve correctly
+    // Set root to src/renderer so index.html is output to dist/index.html (not dist/src/renderer/index.html)
+    root: rendererDir,
     base: '/',
     resolve: {
       alias: {
@@ -86,7 +87,8 @@ export default defineConfig(({ mode }) => {
       sourcemap: isProduction ? 'hidden' : true,
       minify: isProduction ? 'esbuild' : false,
       rollupOptions: {
-        input: resolve(__dirname, 'src/renderer/index.html'),
+        // With root=src/renderer, input is just index.html relative to root
+        input: resolve(rendererDir, 'index.html'),
         output: {
           entryFileNames: 'js/[name].[hash].js',
           chunkFileNames: 'js/[name].[hash].js',
