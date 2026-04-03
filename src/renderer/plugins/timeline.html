@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Timeline Builder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+    }
+    #topic-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 2px;
+    }
+    #instructions {
+      font-size: 11px;
+      color: #666;
+    }
+    #timeline-track {
+      position: relative;
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    /* Vertical timeline line */
+    #timeline-track::before {
+      content: '';
+      position: absolute;
+      left: 28px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: linear-gradient(to bottom, #3b82f6, #8b5cf6);
+      opacity: 0.4;
+    }
+    .event-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      cursor: grab;
+      transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+      position: relative;
+      z-index: 1;
+    }
+    .event-card:hover { border-color: #3b82f6; box-shadow: 0 2px 12px rgba(59,130,246,0.15); }
+    .event-card.dragging {
+      opacity: 0.5;
+      cursor: grabbing;
+      transform: scale(0.98);
+    }
+    .event-card.drag-over { border-color: #8b5cf6; background: #1e1a2e; }
+    .event-card.correct { border-color: #34d399; background: #0d2018; }
+    .event-card.incorrect { border-color: #f87171; background: #200d0d; }
+    .drag-handle {
+      color: #444;
+      font-size: 16px;
+      cursor: grab;
+      flex-shrink: 0;
+      padding-top: 2px;
+    }
+    .event-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #3b82f6;
+      flex-shrink: 0;
+      margin-top: 5px;
+    }
+    .event-content { flex: 1; min-width: 0; }
+    .event-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #e5e5e5;
+      margin-bottom: 2px;
+    }
+    .event-desc {
+      font-size: 11px;
+      color: #666;
+      line-height: 1.4;
+    }
+    .event-year {
+      font-size: 11px;
+      font-weight: 700;
+      color: #888;
+      flex-shrink: 0;
+      padding-top: 3px;
+      display: none; /* Hidden until reveal */
+    }
+    .event-year.revealed { display: block; color: #60a5fa; }
+    .event-card.correct .event-year { color: #34d399; }
+    .event-card.incorrect .event-year { color: #f87171; }
+    #footer {
+      padding: 12px 16px;
+      border-top: 1px solid #222;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #submit-btn {
+      flex: 1;
+      padding: 9px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #submit-btn:hover { background: #2563eb; }
+    #submit-btn:disabled { background: #333; color: #555; cursor: not-allowed; }
+    #score-display {
+      font-size: 13px;
+      font-weight: 700;
+      color: #34d399;
+      display: none;
+    }
+    #waiting-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #555;
+    }
+    #waiting-icon { font-size: 40px; }
+    #waiting-text { font-size: 13px; text-align: center; max-width: 200px; line-height: 1.5; }
+    .keyboard-hint { font-size: 10px; color: #444; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div id="topic-title">Timeline Builder</div>
+    <div id="instructions">Ask the AI to load a topic to begin</div>
+  </div>
+
+  <div id="timeline-track">
+    <div id="waiting-state">
+      <div id="waiting-icon">📅</div>
+      <div id="waiting-text">Ask the AI to load a historical topic and arrange the events in order</div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <button id="submit-btn" disabled>Submit Order</button>
+    <div id="score-display"></div>
+  </div>
+
+  <script>
+    // ─── State ────────────────────────────────────────────────────────────────
+    let sessionId = null
+    let events = []
+    let topic = ''
+    let submitted = false
+    let dragSrcIdx = null
+
+    // ─── Plugin Protocol ──────────────────────────────────────────────────────
+    function sendMessage(type, payload) {
+      window.parent.postMessage({
+        type, pluginId: 'timeline', sessionId,
+        payload, timestamp: Date.now(), version: '1.0'
+      }, '*')
+    }
+
+    function sendStateUpdate(status) {
+      sendMessage('STATE_UPDATE', {
+        state: {
+          type: 'timeline',
+          topic,
+          events: events.map(e => ({ ...e, placed: true })),
+          status,
+          studentOrder: events.map(e => e.id),
+          correctOrder: [...events].sort((a, b) => a.year - b.year).map(e => e.id)
+        }
+      })
+    }
+
+    // ─── Render ───────────────────────────────────────────────────────────────
+    function renderTimeline(showResults = false, perItemCorrectness = {}) {
+      const track = document.getElementById('timeline-track')
+      const waiting = document.getElementById('waiting-state')
+
+      if (events.length === 0) {
+        waiting.style.display = 'flex'
+        return
+      }
+      waiting.style.display = 'none'
+      track.innerHTML = ''
+
+      events.forEach((evt, idx) => {
+        const card = document.createElement('div')
+        card.className = 'event-card'
+        card.draggable = !submitted
+        card.dataset.idx = idx
+        card.setAttribute('tabindex', '0')
+        card.setAttribute('role', 'listitem')
+        card.setAttribute('aria-label', `${evt.name}, drag to reorder`)
+
+        if (showResults) {
+          const correct = perItemCorrectness[evt.id]
+          card.classList.add(correct ? 'correct' : 'incorrect')
+        }
+
+        card.innerHTML = `
+          <div class="drag-handle" aria-hidden="true">⠿</div>
+          <div class="event-dot"></div>
+          <div class="event-content">
+            <div class="event-name">${escapeHtml(evt.name)}</div>
+            <div class="event-desc">${escapeHtml(evt.description || '')}</div>
+          </div>
+          <div class="event-year${showResults ? ' revealed' : ''}">${evt.year}</div>
+        `
+
+        if (!submitted) {
+          card.addEventListener('dragstart', onDragStart)
+          card.addEventListener('dragover', onDragOver)
+          card.addEventListener('drop', onDrop)
+          card.addEventListener('dragend', onDragEnd)
+          // Keyboard accessibility
+          card.addEventListener('keydown', onKeyDown)
+        }
+
+        track.appendChild(card)
+      })
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+
+    // ─── Drag and Drop ────────────────────────────────────────────────────────
+    function onDragStart(e) {
+      dragSrcIdx = parseInt(e.currentTarget.dataset.idx)
+      e.currentTarget.classList.add('dragging')
+      e.dataTransfer.effectAllowed = 'move'
+    }
+
+    function onDragOver(e) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      const target = e.currentTarget
+      if (parseInt(target.dataset.idx) !== dragSrcIdx) {
+        target.classList.add('drag-over')
+      }
+    }
+
+    function onDrop(e) {
+      e.preventDefault()
+      const targetIdx = parseInt(e.currentTarget.dataset.idx)
+      if (dragSrcIdx !== null && dragSrcIdx !== targetIdx) {
+        const moved = events.splice(dragSrcIdx, 1)[0]
+        events.splice(targetIdx, 0, moved)
+        renderTimeline()
+        sendStateUpdate('in_progress')
+      }
+      e.currentTarget.classList.remove('drag-over')
+    }
+
+    function onDragEnd(e) {
+      e.currentTarget.classList.remove('dragging')
+      document.querySelectorAll('.event-card').forEach(c => c.classList.remove('drag-over'))
+      dragSrcIdx = null
+    }
+
+    // Keyboard: arrow keys to move cards
+    function onKeyDown(e) {
+      const idx = parseInt(e.currentTarget.dataset.idx)
+      if (e.key === 'ArrowUp' && idx > 0) {
+        e.preventDefault()
+        const moved = events.splice(idx, 1)[0]
+        events.splice(idx - 1, 0, moved)
+        renderTimeline()
+        sendStateUpdate('in_progress')
+        // Refocus
+        setTimeout(() => {
+          const cards = document.querySelectorAll('.event-card')
+          if (cards[idx - 1]) cards[idx - 1].focus()
+        }, 50)
+      } else if (e.key === 'ArrowDown' && idx < events.length - 1) {
+        e.preventDefault()
+        const moved = events.splice(idx, 1)[0]
+        events.splice(idx + 1, 0, moved)
+        renderTimeline()
+        sendStateUpdate('in_progress')
+        setTimeout(() => {
+          const cards = document.querySelectorAll('.event-card')
+          if (cards[idx + 1]) cards[idx + 1].focus()
+        }, 50)
+      }
+    }
+
+    // ─── Submit ───────────────────────────────────────────────────────────────
+    document.getElementById('submit-btn').addEventListener('click', () => {
+      if (submitted) return
+      submitted = true
+      document.getElementById('submit-btn').disabled = true
+
+      const studentOrder = events.map(e => e.id)
+      const correctOrder = [...events].sort((a, b) => a.year - b.year).map(e => e.id)
+
+      let correct = 0
+      const perItemCorrectness = {}
+      studentOrder.forEach((id, i) => {
+        const isCorrect = id === correctOrder[i]
+        perItemCorrectness[id] = isCorrect
+        if (isCorrect) correct++
+      })
+      const score = Math.round((correct / events.length) * 100)
+
+      renderTimeline(true, perItemCorrectness)
+
+      const scoreEl = document.getElementById('score-display')
+      scoreEl.textContent = `${score}%`
+      scoreEl.style.display = 'block'
+
+      const finalState = {
+        type: 'timeline',
+        topic,
+        events: events.map(e => ({ ...e, placed: true })),
+        status: 'complete',
+        studentOrder,
+        correctOrder,
+        score,
+        perItemCorrectness
+      }
+
+      sendMessage('PLUGIN_COMPLETE', {
+        reason: 'Student submitted timeline arrangement',
+        finalState
+      })
+    })
+
+    // ─── Tool Handlers ────────────────────────────────────────────────────────
+    function handleToolInvoke(toolCallId, toolName, args) {
+      try {
+        if (toolName === 'load_timeline') {
+          topic = args.topic || 'Historical Events'
+          // Generate sample events for the topic
+          events = generateEventsForTopic(topic)
+          submitted = false
+          document.getElementById('topic-title').textContent = topic
+          document.getElementById('instructions').textContent = 'Drag events into chronological order, then submit'
+          document.getElementById('submit-btn').disabled = false
+          document.getElementById('score-display').style.display = 'none'
+          renderTimeline()
+          sendStateUpdate('in_progress')
+          sendMessage('TOOL_RESULT', {
+            toolCallId,
+            result: { success: true, topic, eventCount: events.length },
+            error: null
+          })
+        } else if (toolName === 'validate_arrangement') {
+          const studentOrder = events.map(e => e.id)
+          const correctOrder = [...events].sort((a, b) => a.year - b.year).map(e => e.id)
+          let correct = 0
+          const perItemCorrectness = {}
+          studentOrder.forEach((id, i) => {
+            const isCorrect = id === correctOrder[i]
+            perItemCorrectness[id] = isCorrect
+            if (isCorrect) correct++
+          })
+          const score = Math.round((correct / events.length) * 100)
+          sendMessage('TOOL_RESULT', {
+            toolCallId,
+            result: { studentOrder, correctOrder, score, perItemCorrectness },
+            error: null
+          })
+        } else {
+          throw new Error(`Unknown tool: ${toolName}`)
+        }
+      } catch (err) {
+        sendMessage('TOOL_RESULT', { toolCallId, result: null, error: err.message })
+      }
+    }
+
+    // ─── Event Data Generator ─────────────────────────────────────────────────
+    function generateEventsForTopic(topicName) {
+      const topicLower = topicName.toLowerCase()
+      const datasets = {
+        'american civil war': [
+          { id: 'e1', name: 'Fort Sumter Attack', year: 1861, description: 'Confederate forces attack Fort Sumter, starting the war' },
+          { id: 'e2', name: 'Battle of Antietam', year: 1862, description: 'Bloodiest single day in American military history' },
+          { id: 'e3', name: 'Emancipation Proclamation', year: 1863, description: 'Lincoln declares enslaved people in rebel states free' },
+          { id: 'e4', name: 'Battle of Gettysburg', year: 1863, description: 'Turning point of the war in the Union\'s favor' },
+          { id: 'e5', name: 'Sherman\'s March to the Sea', year: 1864, description: 'Union general devastates Confederate supply lines' },
+          { id: 'e6', name: 'Lee Surrenders at Appomattox', year: 1865, description: 'Confederate General Lee surrenders, ending the war' },
+        ],
+        'world war ii': [
+          { id: 'e1', name: 'Germany Invades Poland', year: 1939, description: 'Triggers declarations of war from Britain and France' },
+          { id: 'e2', name: 'Battle of Britain', year: 1940, description: 'RAF defends Britain against Luftwaffe air campaign' },
+          { id: 'e3', name: 'Pearl Harbor Attack', year: 1941, description: 'Japan attacks US naval base, bringing America into the war' },
+          { id: 'e4', name: 'Battle of Stalingrad', year: 1942, description: 'Turning point on the Eastern Front' },
+          { id: 'e5', name: 'D-Day Normandy Invasion', year: 1944, description: 'Allied forces land in France, beginning liberation of Europe' },
+          { id: 'e6', name: 'V-E Day', year: 1945, description: 'Germany surrenders, ending the war in Europe' },
+        ],
+        'american revolution': [
+          { id: 'e1', name: 'Boston Massacre', year: 1770, description: 'British soldiers kill five colonists, inflaming tensions' },
+          { id: 'e2', name: 'Boston Tea Party', year: 1773, description: 'Colonists dump British tea into Boston Harbor' },
+          { id: 'e3', name: 'Battles of Lexington and Concord', year: 1775, description: '"The shot heard round the world" — war begins' },
+          { id: 'e4', name: 'Declaration of Independence', year: 1776, description: 'Colonies formally declare independence from Britain' },
+          { id: 'e5', name: 'Valley Forge', year: 1777, description: 'Washington\'s army endures brutal winter encampment' },
+          { id: 'e6', name: 'Battle of Yorktown', year: 1781, description: 'Cornwallis surrenders, effectively ending the war' },
+        ],
+      }
+
+      // Find matching dataset
+      for (const [key, data] of Object.entries(datasets)) {
+        if (topicLower.includes(key) || key.includes(topicLower)) {
+          return shuffle([...data])
+        }
+      }
+
+      // Generic fallback
+      return shuffle([
+        { id: 'e1', name: `${topicName}: Event 1`, year: 1800, description: 'First major event' },
+        { id: 'e2', name: `${topicName}: Event 2`, year: 1820, description: 'Second major event' },
+        { id: 'e3', name: `${topicName}: Event 3`, year: 1840, description: 'Third major event' },
+        { id: 'e4', name: `${topicName}: Event 4`, year: 1860, description: 'Fourth major event' },
+        { id: 'e5', name: `${topicName}: Event 5`, year: 1880, description: 'Fifth major event' },
+      ])
+    }
+
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]]
+      }
+      return arr
+    }
+
+    // ─── Message Listener ─────────────────────────────────────────────────────
+    window.addEventListener('message', (event) => {
+      const msg = event.data
+      if (!msg || msg.pluginId !== 'timeline') return
+      if (msg.type === 'PLUGIN_INIT') {
+        sessionId = msg.payload.sessionId
+      } else if (msg.type === 'TOOL_INVOKE') {
+        handleToolInvoke(msg.payload.toolCallId, msg.payload.toolName, msg.payload.arguments)
+      }
+    })
+
+    // Boot
+    sendMessage('PLUGIN_READY', { version: '1.0', capabilities: ['load_timeline', 'validate_arrangement'] })
+  </script>
+</body>
+</html>

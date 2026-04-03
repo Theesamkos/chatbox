@@ -8,6 +8,7 @@ import {
   IconLayoutSidebarLeftCollapse,
   IconMessageChatbot,
   IconPhotoPlus,
+  IconSchool,
   IconSettingsFilled,
 } from '@tabler/icons-react'
 import { useNavigate } from '@tanstack/react-router'
@@ -314,6 +315,18 @@ export default function Sidebar() {
                   if (isSmallScreen) {
                     setShowSidebar(false)
                   }
+                }}
+                variant="light"
+                p="xs"
+              />
+              <NavLink
+                c="chatbox-secondary"
+                className="rounded"
+                label="K-12 Tutor"
+                leftSection={<ScalableIcon icon={IconSchool} size={20} />}
+                onClick={() => {
+                  navigate({ to: '/k12' })
+                  if (isSmallScreen) setShowSidebar(false)
                 }}
                 variant="light"
                 p="xs"

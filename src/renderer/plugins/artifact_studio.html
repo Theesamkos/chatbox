@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Artifact Investigation Studio</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #header {
+      padding: 12px 16px 10px;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #header-title { font-size: 13px; font-weight: 600; color: #fff; }
+    #phase-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 20px;
+      background: #1e3a5f;
+      color: #60a5fa;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    #main-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    /* Waiting state */
+    #waiting-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: #555;
+      text-align: center;
+      padding: 20px;
+    }
+    #waiting-icon { font-size: 48px; }
+    #waiting-text { font-size: 13px; line-height: 1.6; max-width: 220px; }
+
+    /* Artifact card */
+    #artifact-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+      display: none;
+    }
+    #artifact-card.visible { display: block; }
+    #artifact-image-container {
+      width: 100%;
+      height: 180px;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    #artifact-image {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+    }
+    #artifact-image-placeholder {
+      font-size: 64px;
+      opacity: 0.3;
+    }
+    #artifact-info { padding: 12px; }
+    #artifact-name { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    #artifact-meta { font-size: 11px; color: #666; line-height: 1.5; }
+    #artifact-culture { color: #8b5cf6; font-weight: 600; }
+
+    /* Investigation phases */
+    .phase-section {
+      background: #141414;
+      border: 1px solid #222;
+      border-radius: 8px;
+      overflow: hidden;
+      display: none;
+    }
+    .phase-section.active { display: block; }
+    .phase-header {
+      padding: 10px 12px;
+      background: #1a1a1a;
+      border-bottom: 1px solid #222;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .phase-number {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #3b82f6;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .phase-title { font-size: 12px; font-weight: 600; color: #e5e5e5; }
+    .phase-body { padding: 12px; }
+    textarea {
+      width: 100%;
+      background: #0f0f0f;
+      border: 1px solid #333;
+      border-radius: 6px;
+      color: #e5e5e5;
+      font-size: 12px;
+      padding: 8px 10px;
+      resize: none;
+      font-family: inherit;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+    textarea:focus { outline: none; border-color: #3b82f6; }
+    textarea::placeholder { color: #444; }
+    .submit-phase-btn {
+      margin-top: 8px;
+      padding: 7px 14px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .submit-phase-btn:hover { background: #2563eb; }
+    .submit-phase-btn:disabled { background: #333; color: #555; cursor: not-allowed; }
+
+    /* Evidence grid */
+    #evidence-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .evidence-item {
+      background: #0f0f0f;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 8px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+      font-size: 11px;
+    }
+    .evidence-item:hover { border-color: #3b82f6; }
+    .evidence-item.selected { border-color: #3b82f6; background: #1e2d4a; }
+    .evidence-label { font-weight: 600; color: #e5e5e5; margin-bottom: 2px; }
+    .evidence-value { color: #888; }
+
+    /* Hypothesis section */
+    #hypothesis-display {
+      background: #0f1a0f;
+      border: 1px solid #1a3a1a;
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 12px;
+      color: #86efac;
+      line-height: 1.5;
+      display: none;
+    }
+    #hypothesis-display.visible { display: block; }
+
+    /* Completion */
+    #completion-section {
+      background: #0d2018;
+      border: 1px solid #1a4a2a;
+      border-radius: 8px;
+      padding: 14px;
+      text-align: center;
+      display: none;
+    }
+    #completion-section.visible { display: block; }
+    #completion-icon { font-size: 32px; margin-bottom: 8px; }
+    #completion-title { font-size: 14px; font-weight: 700; color: #34d399; margin-bottom: 4px; }
+    #completion-text { font-size: 12px; color: #666; line-height: 1.5; }
+
+    /* Search results */
+    #search-results {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .search-result-card {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 6px;
+      padding: 10px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .search-result-card:hover { border-color: #3b82f6; }
+    .result-title { font-size: 12px; font-weight: 600; color: #e5e5e5; margin-bottom: 3px; }
+    .result-meta { font-size: 10px; color: #666; }
+    .result-select-btn {
+      margin-top: 6px;
+      padding: 4px 10px;
+      background: transparent;
+      border: 1px solid #3b82f6;
+      color: #60a5fa;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .result-select-btn:hover { background: #1e3a5f; }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div id="header-title">🔍 Artifact Investigation Studio</div>
+    <div id="phase-badge">Waiting</div>
+  </div>
+
+  <div id="main-content">
+    <div id="waiting-state">
+      <div id="waiting-icon">🏺</div>
+      <div id="waiting-text">Ask the AI to load an artifact for investigation. You can search by culture, time period, or type of object.</div>
+    </div>
+
+    <!-- Artifact display card -->
+    <div id="artifact-card">
+      <div id="artifact-image-container">
+        <img id="artifact-image" src="" alt="" style="display:none" />
+        <div id="artifact-image-placeholder">🏺</div>
+      </div>
+      <div id="artifact-info">
+        <div id="artifact-name">Loading...</div>
+        <div id="artifact-meta">
+          <span id="artifact-culture"></span>
+          <span id="artifact-date"></span>
+          <span id="artifact-medium"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search results -->
+    <div id="search-results"></div>
+
+    <!-- Phase 1: Observation -->
+    <div class="phase-section" id="phase-observe">
+      <div class="phase-header">
+        <div class="phase-number">1</div>
+        <div class="phase-title">Observe — What do you see?</div>
+      </div>
+      <div class="phase-body">
+        <textarea id="observation-input" rows="4" placeholder="Describe what you see: materials, colors, shapes, symbols, size, condition..."></textarea>
+        <button class="submit-phase-btn" id="submit-observation">Submit Observations</button>
+      </div>
+    </div>
+
+    <!-- Phase 2: Evidence Selection -->
+    <div class="phase-section" id="phase-evidence">
+      <div class="phase-header">
+        <div class="phase-number">2</div>
+        <div class="phase-title">Analyze — Select key evidence</div>
+      </div>
+      <div class="phase-body">
+        <div id="evidence-grid"></div>
+        <button class="submit-phase-btn" id="submit-evidence">Analyze Evidence</button>
+      </div>
+    </div>
+
+    <!-- Phase 3: Hypothesis -->
+    <div class="phase-section" id="phase-hypothesis">
+      <div class="phase-header">
+        <div class="phase-number">3</div>
+        <div class="phase-title">Hypothesize — What was this used for?</div>
+      </div>
+      <div class="phase-body">
+        <textarea id="hypothesis-input" rows="3" placeholder="Based on the evidence, what do you think this object was used for? Who might have owned it?"></textarea>
+        <button class="submit-phase-btn" id="submit-hypothesis">Submit Hypothesis</button>
+      </div>
+    </div>
+
+    <!-- Phase 4: Conclusion -->
+    <div class="phase-section" id="phase-conclusion">
+      <div class="phase-header">
+        <div class="phase-number">4</div>
+        <div class="phase-title">Conclude — Write your investigation report</div>
+      </div>
+      <div class="phase-body">
+        <textarea id="conclusion-input" rows="4" placeholder="Write a short paragraph summarizing your investigation: what you observed, what evidence you found, and what you concluded..."></textarea>
+        <button class="submit-phase-btn" id="submit-conclusion">Complete Investigation</button>
+      </div>
+    </div>
+
+    <!-- Completion -->
+    <div id="completion-section">
+      <div id="completion-icon">🎓</div>
+      <div id="completion-title">Investigation Complete!</div>
+      <div id="completion-text">Great work! Your investigation report has been submitted. Check the chat for feedback from your AI tutor.</div>
+    </div>
+  </div>
+
+  <script>
+    // ─── State ────────────────────────────────────────────────────────────────
+    let sessionId = null
+    let currentPhase = 'waiting' // waiting | search | observe | evidence | hypothesis | conclusion | complete
+    let selectedArtifact = null
+    let investigation = {
+      observations: '',
+      selectedEvidence: [],
+      hypothesis: '',
+      conclusion: ''
+    }
+
+    // ─── Plugin Protocol ──────────────────────────────────────────────────────
+    function sendMessage(type, payload) {
+      window.parent.postMessage({
+        type, pluginId: 'artifact_studio', sessionId,
+        payload, timestamp: Date.now(), version: '1.0'
+      }, '*')
+    }
+
+    function sendStateUpdate() {
+      sendMessage('STATE_UPDATE', {
+        state: {
+          type: 'artifact_investigation',
+          phase: currentPhase,
+          status: currentPhase === 'complete' ? 'complete' : 'in_progress',
+          selectedArtifact,
+          investigation: { ...investigation }
+        }
+      })
+    }
+
+    // ─── Phase Management ─────────────────────────────────────────────────────
+    function setPhase(phase) {
+      currentPhase = phase
+      document.getElementById('phase-badge').textContent = phase.charAt(0).toUpperCase() + phase.slice(1)
+
+      // Hide all phase sections
+      document.querySelectorAll('.phase-section').forEach(s => s.classList.remove('active'))
+      document.getElementById('waiting-state').style.display = 'none'
+      document.getElementById('search-results').innerHTML = ''
+      document.getElementById('completion-section').classList.remove('visible')
+
+      if (phase === 'waiting') {
+        document.getElementById('waiting-state').style.display = 'flex'
+      } else if (phase === 'observe') {
+        document.getElementById('phase-observe').classList.add('active')
+      } else if (phase === 'evidence') {
+        document.getElementById('phase-observe').classList.add('active')
+        document.getElementById('phase-evidence').classList.add('active')
+        buildEvidenceGrid()
+      } else if (phase === 'hypothesis') {
+        document.getElementById('phase-observe').classList.add('active')
+        document.getElementById('phase-evidence').classList.add('active')
+        document.getElementById('phase-hypothesis').classList.add('active')
+      } else if (phase === 'conclusion') {
+        document.getElementById('phase-observe').classList.add('active')
+        document.getElementById('phase-evidence').classList.add('active')
+        document.getElementById('phase-hypothesis').classList.add('active')
+        document.getElementById('phase-conclusion').classList.add('active')
+      } else if (phase === 'complete') {
+        document.getElementById('completion-section').classList.add('visible')
+      }
+    }
+
+    function buildEvidenceGrid() {
+      if (!selectedArtifact) return
+      const grid = document.getElementById('evidence-grid')
+      grid.innerHTML = ''
+      const evidenceItems = [
+        { key: 'material', label: 'Material', value: selectedArtifact.medium || 'Unknown' },
+        { key: 'date', label: 'Time Period', value: selectedArtifact.date || 'Unknown' },
+        { key: 'culture', label: 'Culture', value: selectedArtifact.culture || 'Unknown' },
+        { key: 'size', label: 'Dimensions', value: selectedArtifact.dimensions || 'Unknown' },
+        { key: 'condition', label: 'Condition', value: selectedArtifact.creditLine ? 'Preserved' : 'Unknown' },
+        { key: 'origin', label: 'Origin', value: selectedArtifact.country || 'Unknown' },
+      ]
+      evidenceItems.forEach(item => {
+        const el = document.createElement('div')
+        el.className = 'evidence-item'
+        el.dataset.key = item.key
+        el.innerHTML = `<div class="evidence-label">${item.label}</div><div class="evidence-value">${escapeHtml(item.value)}</div>`
+        el.addEventListener('click', () => {
+          el.classList.toggle('selected')
+          const idx = investigation.selectedEvidence.indexOf(item.key)
+          if (idx === -1) investigation.selectedEvidence.push(item.key)
+          else investigation.selectedEvidence.splice(idx, 1)
+          sendStateUpdate()
+        })
+        grid.appendChild(el)
+      })
+    }
+
+    function escapeHtml(str) {
+      return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    }
+
+    // ─── Artifact Display ─────────────────────────────────────────────────────
+    function displayArtifact(artifact) {
+      selectedArtifact = artifact
+      document.getElementById('artifact-card').classList.add('visible')
+      document.getElementById('artifact-name').textContent = artifact.title || 'Unknown Object'
+      document.getElementById('artifact-culture').textContent = artifact.culture ? artifact.culture + ' · ' : ''
+      document.getElementById('artifact-date').textContent = artifact.date ? artifact.date + ' · ' : ''
+      document.getElementById('artifact-medium').textContent = artifact.medium || ''
+
+      if (artifact.primaryImage) {
+        const img = document.getElementById('artifact-image')
+        img.src = artifact.primaryImage
+        img.alt = artifact.title || 'Artifact'
+        img.style.display = 'block'
+        document.getElementById('artifact-image-placeholder').style.display = 'none'
+        img.onerror = () => {
+          img.style.display = 'none'
+          document.getElementById('artifact-image-placeholder').style.display = 'block'
+        }
+      }
+    }
+
+    function displaySearchResults(results) {
+      const container = document.getElementById('search-results')
+      container.innerHTML = ''
+      if (!results || results.length === 0) {
+        container.innerHTML = '<div style="font-size:12px;color:#555;text-align:center;padding:16px">No artifacts found. Try a different search.</div>'
+        return
+      }
+      results.slice(0, 5).forEach(r => {
+        const card = document.createElement('div')
+        card.className = 'search-result-card'
+        card.innerHTML = `
+          <div class="result-title">${escapeHtml(r.title || 'Untitled')}</div>
+          <div class="result-meta">${escapeHtml(r.culture || '')} ${r.date ? '· ' + r.date : ''}</div>
+          <button class="result-select-btn" data-id="${r.objectID}">Investigate this artifact</button>
+        `
+        card.querySelector('.result-select-btn').addEventListener('click', () => {
+          sendMessage('TOOL_RESULT', {
+            toolCallId: window._pendingSelectToolCallId || 'select',
+            result: { selected: r, objectID: r.objectID },
+            error: null
+          })
+          displayArtifact(r)
+          document.getElementById('search-results').innerHTML = ''
+          setPhase('observe')
+          sendStateUpdate()
+        })
+        container.appendChild(card)
+      })
+    }
+
+    // ─── Phase Submit Handlers ────────────────────────────────────────────────
+    document.getElementById('submit-observation').addEventListener('click', () => {
+      const val = document.getElementById('observation-input').value.trim()
+      if (!val) return
+      investigation.observations = val
+      document.getElementById('submit-observation').disabled = true
+      setPhase('evidence')
+      sendStateUpdate()
+      sendMessage('TOOL_RESULT', {
+        toolCallId: window._pendingObserveToolCallId || 'observe',
+        result: { observations: val, phase: 'evidence' },
+        error: null
+      })
+    })
+
+    document.getElementById('submit-evidence').addEventListener('click', () => {
+      if (investigation.selectedEvidence.length === 0) {
+        alert('Please select at least one piece of evidence.')
+        return
+      }
+      document.getElementById('submit-evidence').disabled = true
+      setPhase('hypothesis')
+      sendStateUpdate()
+    })
+
+    document.getElementById('submit-hypothesis').addEventListener('click', () => {
+      const val = document.getElementById('hypothesis-input').value.trim()
+      if (!val) return
+      investigation.hypothesis = val
+      document.getElementById('submit-hypothesis').disabled = true
+      setPhase('conclusion')
+      sendStateUpdate()
+    })
+
+    document.getElementById('submit-conclusion').addEventListener('click', () => {
+      const val = document.getElementById('conclusion-input').value.trim()
+      if (!val) return
+      investigation.conclusion = val
+      document.getElementById('submit-conclusion').disabled = true
+      setPhase('complete')
+      sendStateUpdate()
+
+      sendMessage('PLUGIN_COMPLETE', {
+        reason: 'Student completed artifact investigation',
+        finalState: {
+          type: 'artifact_investigation',
+          phase: 'complete',
+          status: 'complete',
+          selectedArtifact,
+          investigation: { ...investigation }
+        }
+      })
+    })
+
+    // ─── Tool Handlers ────────────────────────────────────────────────────────
+    function handleToolInvoke(toolCallId, toolName, args) {
+      try {
+        if (toolName === 'search_artifacts') {
+          window._pendingSelectToolCallId = toolCallId
+          // Display search results from args (AI provides results)
+          if (args.results && Array.isArray(args.results)) {
+            document.getElementById('waiting-state').style.display = 'none'
+            displaySearchResults(args.results)
+          } else {
+            // Show placeholder results
+            displaySearchResults([
+              { objectID: 1, title: args.query + ' Artifact', culture: 'Ancient', date: '500 BCE', medium: 'Bronze' }
+            ])
+          }
+          sendMessage('TOOL_RESULT', { toolCallId, result: { query: args.query, displayed: true }, error: null })
+        } else if (toolName === 'load_artifact') {
+          const artifact = args.artifact || {
+            objectID: args.objectID || 1,
+            title: args.title || 'Historical Artifact',
+            culture: args.culture || '',
+            date: args.date || '',
+            medium: args.medium || '',
+            primaryImage: args.imageUrl || '',
+            dimensions: args.dimensions || '',
+            country: args.country || '',
+          }
+          displayArtifact(artifact)
+          setPhase('observe')
+          sendStateUpdate()
+          sendMessage('TOOL_RESULT', { toolCallId, result: { loaded: true, artifact }, error: null })
+        } else if (toolName === 'advance_phase') {
+          const phase = args.phase
+          if (['observe', 'evidence', 'hypothesis', 'conclusion', 'complete'].includes(phase)) {
+            setPhase(phase)
+            sendStateUpdate()
+          }
+          sendMessage('TOOL_RESULT', { toolCallId, result: { phase: currentPhase }, error: null })
+        } else if (toolName === 'get_investigation_state') {
+          sendMessage('TOOL_RESULT', {
+            toolCallId,
+            result: { phase: currentPhase, investigation: { ...investigation }, selectedArtifact },
+            error: null
+          })
+        } else {
+          throw new Error(`Unknown tool: ${toolName}`)
+        }
+      } catch (err) {
+        sendMessage('TOOL_RESULT', { toolCallId, result: null, error: err.message })
+      }
+    }
+
+    // ─── Message Listener ─────────────────────────────────────────────────────
+    window.addEventListener('message', (event) => {
+      const msg = event.data
+      if (!msg || msg.pluginId !== 'artifact_studio') return
+      if (msg.type === 'PLUGIN_INIT') {
+        sessionId = msg.payload.sessionId
+      } else if (msg.type === 'TOOL_INVOKE') {
+        handleToolInvoke(msg.payload.toolCallId, msg.payload.toolName, msg.payload.arguments)
+      }
+    })
+
+    // Boot
+    sendMessage('PLUGIN_READY', {
+      version: '1.0',
+      capabilities: ['search_artifacts', 'load_artifact', 'advance_phase', 'get_investigation_state']
+    })
+  </script>
+</body>
+</html>

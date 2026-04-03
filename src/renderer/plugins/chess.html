@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chess</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f0f;
+      color: #e5e5e5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+      overflow: hidden;
+    }
+    #status-bar {
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 10px;
+      text-align: center;
+      min-height: 18px;
+    }
+    #status-bar.active { color: #60a5fa; }
+    #status-bar.check { color: #f59e0b; font-weight: 600; }
+    #status-bar.checkmate { color: #34d399; font-weight: 700; }
+    #status-bar.error { color: #f87171; }
+    #board-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 1fr);
+      grid-template-rows: repeat(8, 1fr);
+      border: 2px solid #333;
+      border-radius: 4px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+    }
+    .square {
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.1s;
+      font-size: 36px;
+      line-height: 1;
+      user-select: none;
+    }
+    .square.light { background: #f0d9b5; }
+    .square.dark { background: #b58863; }
+    .square.selected { background: #7fc97f !important; }
+    .square.legal-move::after {
+      content: '';
+      position: absolute;
+      width: 28%;
+      height: 28%;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.25);
+      pointer-events: none;
+    }
+    .square.legal-capture::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 0;
+      background: transparent;
+      border: 4px solid rgba(0,0,0,0.25);
+      pointer-events: none;
+    }
+    .square.last-move { background: rgba(255, 255, 100, 0.35) !important; }
+    .square.in-check { background: rgba(255, 50, 50, 0.6) !important; }
+    #coords-file {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      padding: 2px 0;
+    }
+    .coord { font-size: 10px; color: #555; width: 52px; text-align: center; }
+    #move-log {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #666;
+      max-height: 48px;
+      overflow: hidden;
+      text-align: center;
+      width: 100%;
+    }
+    #game-over-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(4px);
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      border-radius: 2px;
+    }
+    #game-over-overlay.show { display: flex; }
+    #game-over-title { font-size: 22px; font-weight: 700; color: #fff; }
+    #game-over-subtitle { font-size: 13px; color: #aaa; }
+    #new-game-btn {
+      padding: 8px 20px;
+      background: #3b82f6;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    #new-game-btn:hover { background: #2563eb; }
+    @media (max-width: 480px) {
+      .square { width: 40px; height: 40px; font-size: 28px; }
+      .coord { width: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="status-bar">Waiting for game to start...</div>
+  <div id="board-wrapper">
+    <div id="board"></div>
+    <div id="game-over-overlay">
+      <div id="game-over-title"></div>
+      <div id="game-over-subtitle"></div>
+      <button id="new-game-btn">New Game</button>
+    </div>
+  </div>
+  <div id="coords-file">
+    <span class="coord">a</span><span class="coord">b</span><span class="coord">c</span>
+    <span class="coord">d</span><span class="coord">e</span><span class="coord">f</span>
+    <span class="coord">g</span><span class="coord">h</span>
+  </div>
+  <div id="move-log"></div>
+
+  <script>
+    // ─── Chess Engine (minimal FEN-based implementation) ─────────────────────
+    // Full chess.js would be loaded via CDN in production; here we implement
+    // the core logic needed for the plugin protocol
+
+    const PIECES = {
+      'K': '♔', 'Q': '♕', 'R': '♖', 'B': '♗', 'N': '♘', 'P': '♙',
+      'k': '♚', 'q': '♛', 'r': '♜', 'b': '♝', 'n': '♞', 'p': '♟'
+    }
+
+    // ─── State ────────────────────────────────────────────────────────────────
+    let sessionId = null
+    let pluginId = 'chess'
+    let userRole = 'student'
+    let playerColor = 'white'
+    let selectedSquare = null
+    let legalMovesCache = []
+    let lastMove = null
+    let moveHistory = []
+    let gameStatus = 'waiting' // waiting | active | checkmate | stalemate | draw | resigned
+
+    // Simple board state (array of 64)
+    let board = new Array(64).fill(null)
+    let turn = 'white'
+    let inCheck = false
+    let checkSquare = null
+
+    // ─── FEN Parser ───────────────────────────────────────────────────────────
+    function parseFEN(fen) {
+      const parts = fen.split(' ')
+      const rows = parts[0].split('/')
+      const newBoard = new Array(64).fill(null)
+      let idx = 0
+      for (let r = 0; r < 8; r++) {
+        for (const ch of rows[r]) {
+          if (/[1-8]/.test(ch)) {
+            idx += parseInt(ch)
+          } else {
+            newBoard[idx++] = ch
+          }
+        }
+      }
+      return {
+        board: newBoard,
+        turn: parts[1] === 'w' ? 'white' : 'black',
+        castling: parts[2] || '-',
+        enPassant: parts[3] || '-',
+        halfMove: parseInt(parts[4] || '0'),
+        fullMove: parseInt(parts[5] || '1'),
+      }
+    }
+
+    function boardToFEN(b, t, castling = 'KQkq', ep = '-', hm = 0, fm = 1) {
+      let fen = ''
+      for (let r = 0; r < 8; r++) {
+        let empty = 0
+        for (let c = 0; c < 8; c++) {
+          const piece = b[r * 8 + c]
+          if (piece) {
+            if (empty > 0) { fen += empty; empty = 0 }
+            fen += piece
+          } else {
+            empty++
+          }
+        }
+        if (empty > 0) fen += empty
+        if (r < 7) fen += '/'
+      }
+      return `${fen} ${t === 'white' ? 'w' : 'b'} ${castling} ${ep} ${hm} ${fm}`
+    }
+
+    // ─── Legal Move Generation (simplified) ───────────────────────────────────
+    function squareToIdx(sq) {
+      const file = sq.charCodeAt(0) - 97
+      const rank = 8 - parseInt(sq[1])
+      return rank * 8 + file
+    }
+
+    function idxToSquare(idx) {
+      const file = String.fromCharCode(97 + (idx % 8))
+      const rank = 8 - Math.floor(idx / 8)
+      return file + rank
+    }
+
+    function isWhitePiece(p) { return p && p === p.toUpperCase() }
+    function isBlackPiece(p) { return p && p === p.toLowerCase() }
+    function isFriendly(p, color) {
+      return color === 'white' ? isWhitePiece(p) : isBlackPiece(p)
+    }
+    function isEnemy(p, color) {
+      return color === 'white' ? isBlackPiece(p) : isWhitePiece(p)
+    }
+
+    function getLegalMovesForSquare(b, fromIdx, color) {
+      const piece = b[fromIdx]
+      if (!piece || !isFriendly(piece, color)) return []
+      const moves = []
+      const type = piece.toUpperCase()
+      const r = Math.floor(fromIdx / 8)
+      const c = fromIdx % 8
+
+      const addMove = (toIdx) => {
+        if (toIdx < 0 || toIdx > 63) return
+        if (isFriendly(b[toIdx], color)) return
+        moves.push(toIdx)
+      }
+
+      const slide = (dr, dc) => {
+        let nr = r + dr, nc = c + dc
+        while (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) {
+          const idx = nr * 8 + nc
+          if (isFriendly(b[idx], color)) break
+          moves.push(idx)
+          if (isEnemy(b[idx], color)) break
+          nr += dr; nc += dc
+        }
+      }
+
+      if (type === 'P') {
+        const dir = color === 'white' ? -1 : 1
+        const startRank = color === 'white' ? 6 : 1
+        const fwd = fromIdx + dir * 8
+        if (fwd >= 0 && fwd < 64 && !b[fwd]) {
+          moves.push(fwd)
+          const fwd2 = fromIdx + dir * 16
+          if (r === startRank && !b[fwd2]) moves.push(fwd2)
+        }
+        const captureLeft = fromIdx + dir * 8 - 1
+        const captureRight = fromIdx + dir * 8 + 1
+        if (c > 0 && isEnemy(b[captureLeft], color)) moves.push(captureLeft)
+        if (c < 7 && isEnemy(b[captureRight], color)) moves.push(captureRight)
+      } else if (type === 'N') {
+        const deltas = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]
+        for (const [dr, dc] of deltas) {
+          const nr = r + dr, nc = c + dc
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) addMove(nr * 8 + nc)
+        }
+      } else if (type === 'B') {
+        slide(-1,-1); slide(-1,1); slide(1,-1); slide(1,1)
+      } else if (type === 'R') {
+        slide(-1,0); slide(1,0); slide(0,-1); slide(0,1)
+      } else if (type === 'Q') {
+        slide(-1,-1); slide(-1,1); slide(1,-1); slide(1,1)
+        slide(-1,0); slide(1,0); slide(0,-1); slide(0,1)
+      } else if (type === 'K') {
+        const deltas = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]]
+        for (const [dr, dc] of deltas) {
+          const nr = r + dr, nc = c + dc
+          if (nr >= 0 && nr < 8 && nc >= 0 && nc < 8) addMove(nr * 8 + nc)
+        }
+      }
+      return moves
+    }
+
+    function getAllLegalMoves(b, color) {
+      const moves = []
+      for (let i = 0; i < 64; i++) {
+        if (isFriendly(b[i], color)) {
+          const targets = getLegalMovesForSquare(b, i, color)
+          for (const t of targets) moves.push({ from: i, to: t })
+        }
+      }
+      return moves
+    }
+
+    function findKing(b, color) {
+      const king = color === 'white' ? 'K' : 'k'
+      return b.indexOf(king)
+    }
+
+    function isSquareAttacked(b, idx, byColor) {
+      const allMoves = getAllLegalMoves(b, byColor)
+      return allMoves.some(m => m.to === idx)
+    }
+
+    function isInCheck(b, color) {
+      const kingIdx = findKing(b, color)
+      if (kingIdx === -1) return false
+      const opponent = color === 'white' ? 'black' : 'white'
+      return isSquareAttacked(b, kingIdx, opponent)
+    }
+
+    function applyMove(b, from, to) {
+      const newBoard = [...b]
+      const piece = newBoard[from]
+      newBoard[to] = piece
+      newBoard[from] = null
+      // Pawn promotion (auto-queen)
+      if (piece === 'P' && Math.floor(to / 8) === 0) newBoard[to] = 'Q'
+      if (piece === 'p' && Math.floor(to / 8) === 7) newBoard[to] = 'q'
+      return newBoard
+    }
+
+    function getLegalMovesFiltered(b, fromIdx, color) {
+      const pseudoMoves = getLegalMovesForSquare(b, fromIdx, color)
+      return pseudoMoves.filter(toIdx => {
+        const newBoard = applyMove(b, fromIdx, toIdx)
+        return !isInCheck(newBoard, color)
+      })
+    }
+
+    function hasAnyLegalMove(b, color) {
+      for (let i = 0; i < 64; i++) {
+        if (isFriendly(b[i], color)) {
+          if (getLegalMovesFiltered(b, i, color).length > 0) return true
+        }
+      }
+      return false
+    }
+
+    // ─── Board Rendering ──────────────────────────────────────────────────────
+    function renderBoard() {
+      const boardEl = document.getElementById('board')
+      boardEl.innerHTML = ''
+      const kingIdx = inCheck ? findKing(board, turn) : -1
+
+      for (let r = 0; r < 8; r++) {
+        for (let c = 0; c < 8; c++) {
+          const idx = r * 8 + c
+          const sq = document.createElement('div')
+          sq.className = 'square ' + ((r + c) % 2 === 0 ? 'light' : 'dark')
+          sq.dataset.idx = idx
+
+          if (selectedSquare === idx) sq.classList.add('selected')
+          if (lastMove && (lastMove.from === idx || lastMove.to === idx)) sq.classList.add('last-move')
+          if (inCheck && idx === kingIdx) sq.classList.add('in-check')
+
+          if (legalMovesCache.includes(idx)) {
+            if (board[idx]) sq.classList.add('legal-capture')
+            else sq.classList.add('legal-move')
+          }
+
+          if (board[idx]) {
+            sq.textContent = PIECES[board[idx]] || board[idx]
+          }
+
+          sq.addEventListener('click', () => handleSquareClick(idx))
+          boardEl.appendChild(sq)
+        }
+      }
+    }
+
+    function handleSquareClick(idx) {
+      if (gameStatus !== 'active') return
+      if (turn !== playerColor) return // Not player's turn
+
+      if (selectedSquare === null) {
+        if (isFriendly(board[idx], playerColor)) {
+          selectedSquare = idx
+          legalMovesCache = getLegalMovesFiltered(board, idx, playerColor)
+          renderBoard()
+        }
+      } else {
+        if (legalMovesCache.includes(idx)) {
+          executeMove(selectedSquare, idx)
+        } else if (isFriendly(board[idx], playerColor)) {
+          selectedSquare = idx
+          legalMovesCache = getLegalMovesFiltered(board, idx, playerColor)
+          renderBoard()
+        } else {
+          selectedSquare = null
+          legalMovesCache = []
+          renderBoard()
+        }
+      }
+    }
+
+    function executeMove(from, to) {
+      const fromSq = idxToSquare(from)
+      const toSq = idxToSquare(to)
+      const moveUCI = fromSq + toSq
+      const piece = board[from]
+      const captured = board[to]
+
+      board = applyMove(board, from, to)
+      lastMove = { from, to }
+      moveHistory.push(moveUCI)
+      selectedSquare = null
+      legalMovesCache = []
+
+      const opponent = turn === 'white' ? 'black' : 'white'
+      turn = opponent
+      inCheck = isInCheck(board, turn)
+      checkSquare = inCheck ? findKing(board, turn) : null
+
+      const hasMove = hasAnyLegalMove(board, turn)
+      let status = 'active'
+      if (!hasMove) {
+        status = inCheck ? 'checkmate' : 'stalemate'
+        gameStatus = status
+      }
+
+      const fen = boardToFEN(board, turn)
+      updateStatus(status, inCheck)
+      renderBoard()
+      sendStateUpdate(fen, status)
+
+      if (status === 'checkmate' || status === 'stalemate') {
+        showGameOver(status)
+        sendPluginComplete(status, fen)
+      }
+
+      updateMoveLog()
+    }
+
+    function updateStatus(status, check) {
+      const el = document.getElementById('status-bar')
+      if (status === 'checkmate') {
+        const winner = turn === 'white' ? 'Black' : 'White'
+        el.textContent = `Checkmate! ${winner} wins.`
+        el.className = 'checkmate'
+      } else if (status === 'stalemate') {
+        el.textContent = 'Stalemate! Draw.'
+        el.className = 'checkmate'
+      } else if (check) {
+        el.textContent = `${turn.charAt(0).toUpperCase() + turn.slice(1)} is in check!`
+        el.className = 'check'
+      } else {
+        el.textContent = `${turn.charAt(0).toUpperCase() + turn.slice(1)}'s turn`
+        el.className = 'active'
+      }
+    }
+
+    function updateMoveLog() {
+      const el = document.getElementById('move-log')
+      const recent = moveHistory.slice(-6)
+      el.textContent = recent.join('  ')
+    }
+
+    function showGameOver(status) {
+      const overlay = document.getElementById('game-over-overlay')
+      const title = document.getElementById('game-over-title')
+      const subtitle = document.getElementById('game-over-subtitle')
+      if (status === 'checkmate') {
+        const winner = turn === 'white' ? 'Black' : 'White'
+        title.textContent = `${winner} wins!`
+        subtitle.textContent = 'Checkmate'
+      } else {
+        title.textContent = "It's a Draw"
+        subtitle.textContent = 'Stalemate'
+      }
+      overlay.classList.add('show')
+    }
+
+    document.getElementById('new-game-btn').addEventListener('click', () => {
+      document.getElementById('game-over-overlay').classList.remove('show')
+      startNewGame(playerColor)
+    })
+
+    // ─── Game Initialization ──────────────────────────────────────────────────
+    const START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+
+    function startNewGame(color = 'white') {
+      playerColor = color
+      const parsed = parseFEN(START_FEN)
+      board = parsed.board
+      turn = parsed.turn
+      inCheck = false
+      checkSquare = null
+      selectedSquare = null
+      legalMovesCache = []
+      lastMove = null
+      moveHistory = []
+      gameStatus = 'active'
+      updateStatus('active', false)
+      renderBoard()
+      updateMoveLog()
+      sendStateUpdate(START_FEN, 'active')
+    }
+
+    // ─── Plugin Protocol ──────────────────────────────────────────────────────
+    function sendMessage(type, payload) {
+      const msg = {
+        type,
+        pluginId: 'chess',
+        sessionId,
+        payload,
+        timestamp: Date.now(),
+        version: '1.0'
+      }
+      window.parent.postMessage(msg, '*')
+    }
+
+    function sendStateUpdate(fen, status) {
+      sendMessage('STATE_UPDATE', {
+        state: {
+          type: 'chess',
+          fen,
+          turn,
+          moveHistory: [...moveHistory],
+          status,
+          lastMove: moveHistory.length > 0 ? moveHistory[moveHistory.length - 1] : null,
+          capturedPieces: { white: [], black: [] }
+        }
+      })
+    }
+
+    function sendPluginComplete(reason, fen) {
+      sendMessage('PLUGIN_COMPLETE', {
+        reason,
+        finalState: {
+          type: 'chess',
+          fen,
+          turn,
+          moveHistory: [...moveHistory],
+          status: reason,
+          lastMove: moveHistory.length > 0 ? moveHistory[moveHistory.length - 1] : null,
+          capturedPieces: { white: [], black: [] }
+        }
+      })
+    }
+
+    // ─── Handle Tool Invocations ──────────────────────────────────────────────
+    function handleToolInvoke(toolCallId, toolName, args) {
+      try {
+        let result = null
+        if (toolName === 'start_game') {
+          const color = args.playerColor || 'white'
+          startNewGame(color)
+          result = { success: true, fen: boardToFEN(board, turn), playerColor: color }
+        } else if (toolName === 'make_move') {
+          const move = args.move
+          if (!move || move.length < 4) throw new Error('Invalid move format')
+          const from = squareToIdx(move.slice(0, 2))
+          const to = squareToIdx(move.slice(2, 4))
+          const legal = getLegalMovesFiltered(board, from, turn)
+          if (!legal.includes(to)) throw new Error(`Illegal move: ${move}`)
+          executeMove(from, to)
+          result = { success: true, fen: boardToFEN(board, turn), move }
+        } else if (toolName === 'get_board_state') {
+          result = {
+            fen: boardToFEN(board, turn),
+            turn,
+            status: gameStatus,
+            moveHistory: [...moveHistory],
+            inCheck
+          }
+        } else if (toolName === 'get_legal_moves') {
+          const allMoves = []
+          for (let i = 0; i < 64; i++) {
+            if (isFriendly(board[i], turn)) {
+              const targets = getLegalMovesFiltered(board, i, turn)
+              for (const t of targets) {
+                allMoves.push(idxToSquare(i) + idxToSquare(t))
+              }
+            }
+          }
+          result = { legalMoves: allMoves, turn }
+        } else {
+          throw new Error(`Unknown tool: ${toolName}`)
+        }
+        sendMessage('TOOL_RESULT', { toolCallId, result, error: null })
+      } catch (err) {
+        sendMessage('TOOL_RESULT', { toolCallId, result: null, error: err.message })
+      }
+    }
+
+    // ─── Message Listener ─────────────────────────────────────────────────────
+    window.addEventListener('message', (event) => {
+      const msg = event.data
+      if (!msg || msg.pluginId !== 'chess') return
+
+      if (msg.type === 'PLUGIN_INIT') {
+        sessionId = msg.payload.sessionId
+        userRole = msg.payload.userRole || 'student'
+        document.getElementById('status-bar').textContent = 'Ready to play! Ask the AI to start a game.'
+      } else if (msg.type === 'TOOL_INVOKE') {
+        handleToolInvoke(msg.payload.toolCallId, msg.payload.toolName, msg.payload.arguments)
+      }
+    })
+
+    // ─── Boot ─────────────────────────────────────────────────────────────────
+    // Render empty board immediately
+    const parsed = parseFEN(START_FEN)
+    board = parsed.board
+    renderBoard()
+
+    // Send PLUGIN_READY
+    sendMessage('PLUGIN_READY', { version: '1.0', capabilities: ['start_game', 'make_move', 'get_board_state', 'get_legal_moves'] })
+  </script>
+</body>
+</html>
