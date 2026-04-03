@@ -140,6 +140,8 @@ export async function createSession(newSession: Omit<Session, 'id'>, previousId?
     },
   }
   await storage.setItemNow(StorageKeyGenerator.session(session.id), session)
+  // Pre-populate React Query cache immediately so the route renders without waiting for IndexedDB read
+  _setSessionCache(session.id, session)
   const sMeta = getSessionMeta(session)
   await updateSessionList((sessions) => {
     if (!sessions) {
