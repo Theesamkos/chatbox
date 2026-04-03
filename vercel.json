@@ -1,7 +1,7 @@
 {
   "buildCommand": "pnpm run build:web",
   "outputDirectory": "release/app/dist/renderer",
-  "installCommand": "pnpm install",
+  "installCommand": "pnpm install --ignore-scripts && cd release/app && pnpm install --ignore-scripts",
   "framework": null,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
