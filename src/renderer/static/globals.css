@@ -211,6 +211,27 @@
   --mantine-color-chatbox-primary-outline-hover: color-mix(in srgb, var(--chatbox-border-primary), transparent 95%);
 }
 
+/* Body background override for warm theme */
+body,
+[data-mantine-color-scheme="light"] body,
+[data-mantine-color-scheme="light"] {
+  background-color: var(--chatbox-background-primary) !important;
+  color: var(--chatbox-tint-primary);
+}
+
+[data-mantine-color-scheme="dark"] body,
+[data-mantine-color-scheme="dark"] {
+  background-color: var(--chatbox-background-primary) !important;
+  color: var(--chatbox-tint-primary);
+}
+
+/* Mantine component background overrides */
+.mantine-AppShell-root,
+.mantine-Paper-root,
+[data-mantine-color-scheme="light"] .mantine-Paper-root {
+  background-color: var(--chatbox-background-primary);
+}
+
 .mantine-Spotlight-actionsGroup {
   margin-bottom: 2rem;
 }
