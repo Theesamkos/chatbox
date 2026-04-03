@@ -215,8 +215,8 @@ function Root() {
       // Only auto-navigate to last session when starting from root path.
       // If the user navigated directly to a specific route (e.g. /k12, /copilots),
       // respect that intent and do NOT override it with the startup redirect.
-      const currentPath = window.location.pathname
-      if (currentPath !== '/' && currentPath !== '') return
+      // Use location.pathname from TanStack Router (already in scope) for accuracy in SPA.
+      if (location.pathname !== '/' && location.pathname !== '') return
       const { startupPage } = settingsStore.getState()
       const sid = JSON.parse(localStorage.getItem('_currentSessionIdCachedAtom') || '""') as string
       if (sid && startupPage === 'session') {
@@ -226,7 +226,7 @@ function Root() {
         })
       }
     })()
-  }, [])
+  }, [location.pathname])
 
   useEffect(() => {
     if (platform.onNavigate) {
