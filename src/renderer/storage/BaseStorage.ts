@@ -42,7 +42,11 @@ export default class BaseStorage {
         if (key === 'settings') {
           log.info(`[CONFIG_DEBUG] getItem settings: value was null/undefined, using initialValue`)
         }
-        this.setItemNow(key, value)
+        // Do NOT write back null/undefined for session keys — this would permanently destroy session data
+        // Only persist initial values for non-session, non-null defaults (e.g., configs with generated UUIDs)
+        if (initialValue !== null && initialValue !== undefined && !key.startsWith('session:')) {
+          this.setItemNow(key, value)
+        }
       } else if (key === 'settings') {
         const providers = (value as Record<string, unknown>)?.providers
         const providersCount =

@@ -115,11 +115,11 @@ export async function getSession(sessionId: string) {
 }
 
 export function useSession(sessionId: string | null) {
-  const { data: session, ...rest } = useQuery({
+  const { data: session, isLoading, isFetching, isPending, ...rest } = useQuery({
     ...getSessionQueryOptions(sessionId!),
     enabled: !!sessionId,
   })
-  return { session, ...rest }
+  return { session, isLoading, isFetching, isPending, ...rest }
 }
 
 function _setSessionCache(sessionId: string, updated: Session | null) {
