@@ -88,7 +88,9 @@ export function getThemeDesign(realTheme: 'light' | 'dark', fontSize: number, la
         ? {
             fontFamily: 'Cairo, Arial, sans-serif',
           }
-        : {}),
+        : {
+            fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+          }),
       fontSize: (fontSize * 14) / 16,
     },
     direction: language === 'ar' ? 'rtl' : 'ltr',
