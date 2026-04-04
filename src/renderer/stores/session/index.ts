@@ -31,6 +31,7 @@ export { exportSessionChat } from './export'
 export { createNewFork, deleteFork, expandFork, findMessageLocation, switchFork } from './forks'
 // Generation operations (8 functions)
 export {
+  buildK12SystemPrompt,
   createLoadingPictures,
   generate,
   generateMore,

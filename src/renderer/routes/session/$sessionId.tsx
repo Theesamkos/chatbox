@@ -62,11 +62,12 @@ function RouteComponent() {
       const html = getPluginHtml(pending.pluginId)
       setK12PluginHtml(html)
       k12PluginActions.launchPlugin(pending.pluginId)
-      // Send the quickStart message after a short delay to let the session settle
+      // Send the quickStart message after a delay to let the plugin iframe load
+      // and send its first STATE_UPDATE so the AI has full plugin context.
       setTimeout(() => {
         const msg = constructUserMessage(pending.quickStart)
         void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
-      }, 800)
+      }, 1500)
     } catch {
       // Ignore malformed data
     }

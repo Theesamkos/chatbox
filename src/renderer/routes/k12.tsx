@@ -14,7 +14,9 @@ import { Badge, Box, Button, Card, Flex, Grid, Stack, Text, Title } from '@manti
 import { IconBrain, IconChessBishop, IconClock, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { PluginId } from '@/packages/plugin-bridge'
-import { createEmpty } from '@/stores/sessionActions'
+import { buildK12SystemPrompt, createEmpty } from '@/stores/sessionActions'
+import { updateSessionWithMessages } from '@/stores/chatStore'
+import { createMessage } from '@shared/types'
 
 /** localStorage key used to pass plugin launch intent from K12 dashboard → session route */
 export const K12_PENDING_PLUGIN_KEY = 'chatbridge_k12_pending_plugin'
@@ -78,6 +80,29 @@ function K12Dashboard() {
     // Create a new chat session and navigate to it with the plugin pre-selected
     const session = await createEmpty('chat')
     const sessionId = session.id
+
+    // Immediately set the K12 TutorMeAI system prompt so the AI has full context
+    // from the very first message, regardless of whether the plugin state has loaded yet.
+    const k12SystemPrompt = buildK12SystemPrompt()
+    await updateSessionWithMessages(sessionId, (prev) => {
+      const existingSystemMsgIdx = prev.messages.findIndex((m) => m.role === 'system')
+      if (existingSystemMsgIdx >= 0) {
+        // Replace the existing (generic) system message with the K12 prompt
+        const updated = [...prev.messages]
+        updated[existingSystemMsgIdx] = {
+          ...updated[existingSystemMsgIdx],
+          contentParts: [{ type: 'text', text: k12SystemPrompt }],
+        }
+        return { ...prev, messages: updated }
+      } else {
+        // No system message yet — insert one at the front
+        return {
+          ...prev,
+          messages: [createMessage('system', k12SystemPrompt), ...prev.messages],
+        }
+      }
+    })
+
     // Store plugin intent so the session route can launch the plugin on mount
     localStorage.setItem(
       K12_PENDING_PLUGIN_KEY,

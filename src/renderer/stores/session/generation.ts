@@ -578,7 +578,7 @@ export async function genMessageContext(
 }
 
 /** Build the base K-12 TutorMeAI system prompt */
-function buildK12SystemPrompt(): string {
+export function buildK12SystemPrompt(): string {
   return `You are TutorMeAI, a K-12 educational AI assistant built on ChatBridge. Your role is to support students and teachers in learning activities.
 ## Core Guidelines
 - You are designed for K-12 students (ages 5-18). Always use age-appropriate language.

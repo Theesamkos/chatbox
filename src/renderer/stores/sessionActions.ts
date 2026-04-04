@@ -16,6 +16,7 @@ export { exportSessionChat } from './session/export'
 export { createNewFork, deleteFork, expandFork, switchFork } from './session/forks'
 // Re-export generation operations from session/generation.ts
 export {
+  buildK12SystemPrompt,
   createLoadingPictures,
   generate,
   generateMore,
