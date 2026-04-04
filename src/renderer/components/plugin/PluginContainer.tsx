@@ -52,6 +52,58 @@ export function PluginContainer({ state, actions, pluginHtmlContent, onClose }: 
     }
   }, [state.pluginId, actions])
 
+  // API_PROXY_REQUEST handler — plugins run without allow-same-origin so they
+  // cannot fetch() directly. They post API_PROXY_REQUEST; we fetch from the
+  // parent frame (which has full network access) and reply with API_PROXY_RESPONSE.
+  useEffect(() => {
+    const handleProxyRequest = async (event: MessageEvent) => {
+      if (!event.data || event.data.type !== 'API_PROXY_REQUEST') return
+      const msg = event.data as {
+        type: string
+        requestId: string
+        url: string
+        method?: string
+        body?: string | null
+        headers?: Record<string, string> | null
+        sessionId?: string
+        pluginId?: string
+      }
+      const { requestId, url, method = 'GET', body, headers } = msg
+      const iframe = iframeRef.current
+      if (!iframe?.contentWindow) return
+      try {
+        const fetchOptions: RequestInit = {
+          method,
+          headers: { 'Content-Type': 'application/json', ...(headers ?? {}) },
+        }
+        if (body) fetchOptions.body = body
+        const res = await fetch(url, fetchOptions)
+        const data = await res.json().catch(() => null)
+        iframe.contentWindow.postMessage({
+          type: 'API_PROXY_RESPONSE',
+          requestId,
+          sessionId: msg.sessionId,
+          pluginId: msg.pluginId,
+          ok: res.ok,
+          status: res.status,
+          data,
+        }, '*')
+      } catch {
+        iframe.contentWindow?.postMessage({
+          type: 'API_PROXY_RESPONSE',
+          requestId,
+          sessionId: msg.sessionId,
+          pluginId: msg.pluginId,
+          ok: false,
+          status: 0,
+          data: null,
+        }, '*')
+      }
+    }
+    window.addEventListener('message', handleProxyRequest)
+    return () => window.removeEventListener('message', handleProxyRequest)
+  }, [])
+
   const handleClose = useCallback(() => {
     actions.dismissPlugin()
     onClose?.()

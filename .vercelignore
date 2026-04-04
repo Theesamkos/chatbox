@@ -1,0 +1,11 @@
+src/main
+src/preload
+release/app/node_modules
+*.dmg
+*.exe
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.zip
+*.tar.gz

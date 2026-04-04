@@ -115,11 +115,11 @@ export async function getSession(sessionId: string) {
 }
 
 export function useSession(sessionId: string | null) {
-  const { data: session, ...rest } = useQuery({
+  const { data: session, isLoading, isFetching, isPending, ...rest } = useQuery({
     ...getSessionQueryOptions(sessionId!),
     enabled: !!sessionId,
   })
-  return { session, ...rest }
+  return { session, isLoading, isFetching, isPending, ...rest }
 }
 
 function _setSessionCache(sessionId: string, updated: Session | null) {
@@ -140,6 +140,8 @@ export async function createSession(newSession: Omit<Session, 'id'>, previousId?
     },
   }
   await storage.setItemNow(StorageKeyGenerator.session(session.id), session)
+  // Pre-populate React Query cache immediately so the route renders without waiting for IndexedDB read
+  _setSessionCache(session.id, session)
   const sMeta = getSessionMeta(session)
   await updateSessionList((sessions) => {
     if (!sessions) {

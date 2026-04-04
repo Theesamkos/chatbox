@@ -1,21 +1,26 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { Button, Skeleton, Stack } from '@mantine/core'
+import { Button } from '@mantine/core'
 import type { Message, ModelProvider } from '@shared/types'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from 'zustand'
 import MessageList, { type MessageListRef } from '@/components/chat/MessageList'
 import { ErrorBoundary } from '@/components/common/ErrorBoundary'
 import InputBox from '@/components/InputBox/InputBox'
 import Header from '@/components/layout/Header'
+import { K12SessionLayout } from '@/components/plugin/K12SessionLayout'
 import ThreadHistoryDrawer from '@/components/session/ThreadHistoryDrawer'
+import { useK12Plugin } from '@/hooks/useK12Plugin'
+import type { PluginId } from '@/packages/plugin-bridge'
 import * as remote from '@/packages/remote'
+import { getPluginHtml } from '@/plugins/pluginLoader'
+import { K12_PENDING_PLUGIN_KEY } from '@/routes/k12'
 import { updateSession as updateSessionStore, useSession } from '@/stores/chatStore'
 import { lastUsedModelStore } from '@/stores/lastUsedModelStore'
 import * as scrollActions from '@/stores/scrollActions'
 import { modifyMessage, removeCurrentThread, startNewThread, submitNewUserMessage } from '@/stores/sessionActions'
-import { getAllMessageList } from '@/stores/sessionHelpers'
+import { constructUserMessage, getAllMessageList } from '@/stores/sessionHelpers'
 
 export const Route = createFileRoute('/session/$sessionId')({
   component: RouteComponent,
@@ -25,7 +30,7 @@ function RouteComponent() {
   const { t } = useTranslation()
   const { sessionId: currentSessionId } = Route.useParams()
   const navigate = useNavigate()
-  const { session: currentSession, isFetching } = useSession(currentSessionId)
+  const { session: currentSession, isFetching, isLoading, isPending } = useSession(currentSessionId)
   const setLastUsedChatModel = useStore(lastUsedModelStore, (state) => state.setChatModel)
   const setLastUsedPictureModel = useStore(lastUsedModelStore, (state) => state.setPictureModel)
 
@@ -40,6 +45,34 @@ function RouteComponent() {
   const goHome = useCallback(() => {
     navigate({ to: '/', replace: true })
   }, [navigate])
+
+  // ─── K-12 Plugin Split-View ───────────────────────────────────────────────
+  const [k12PluginState, k12PluginActions] = useK12Plugin(currentSessionId)
+  const [k12PluginHtml, setK12PluginHtml] = useState<string | null>(null)
+
+  // On mount: check if we were launched from the K-12 dashboard with a pending plugin
+  useEffect(() => {
+    const raw = localStorage.getItem(K12_PENDING_PLUGIN_KEY)
+    if (!raw) return
+    try {
+      const pending = JSON.parse(raw) as { pluginId: PluginId; quickStart: string; sessionId: string }
+      // Only consume if this is the right session
+      if (pending.sessionId !== currentSessionId) return
+      localStorage.removeItem(K12_PENDING_PLUGIN_KEY)
+      const html = getPluginHtml(pending.pluginId)
+      setK12PluginHtml(html)
+      k12PluginActions.launchPlugin(pending.pluginId)
+      // Send the quickStart message after a short delay to let the session settle
+      setTimeout(() => {
+        const msg = constructUserMessage(pending.quickStart)
+        void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
+      }, 800)
+    } catch {
+      // Ignore malformed data
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId])
+  // ─────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     setTimeout(() => {
@@ -165,19 +198,8 @@ function RouteComponent() {
     }
   }, [currentSession?.settings?.provider, currentSession?.settings?.modelId])
 
-  if (isFetching && !currentSession) {
-    return (
-      <div className="flex flex-col h-full">
-        <Stack gap="md" p="md" pt="xl">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} h={80} radius="md" />
-          ))}
-        </Stack>
-      </div>
-    )
-  }
-
-  return currentSession ? (
+  // The chat panel — used by both plain sessions and K-12 split-view
+  const chatPanel = currentSession ? (
     <div className="flex flex-col h-full">
       <Header session={currentSession} />
 
@@ -202,8 +224,20 @@ function RouteComponent() {
       </ErrorBoundary>
       <ThreadHistoryDrawer session={currentSession} />
     </div>
+  ) : null
+
+  return currentSession ? (
+    <K12SessionLayout
+      pluginState={k12PluginState}
+      pluginActions={k12PluginActions}
+      pluginHtmlContent={k12PluginHtml}
+      onPluginClose={() => setK12PluginHtml(null)}
+    >
+      {chatPanel}
+    </K12SessionLayout>
   ) : (
-    !isFetching && (
+    // Only show 'not found' when query is fully settled: not loading, not fetching, not in pending state
+    !isLoading && !isFetching && !isPending && (
       <div className="flex flex-1 flex-col items-center justify-center min-h-[60vh]">
         <div className="text-2xl font-semibold text-gray-700 mb-4">{t('Conversation not found')}</div>
         <Button variant="outline" onClick={goHome}>

@@ -181,21 +181,30 @@ export class PluginBridge {
   // ─── Origin Validation ──────────────────────────────────────────────────────
 
   private validateOrigin(origin: string): boolean {
-    // In development, allow localhost origins for the registered plugin
     const registeredOrigin = this.manifest.origin
+
+    // Exact match (covers the 'null' === 'null' case for srcdoc iframes)
     if (origin === registeredOrigin) return true
+
+    // For null-origin plugins (srcdoc), only accept 'null' origin — already handled above.
+    // Skip URL parsing for 'null' to avoid Invalid URL errors.
+    if (registeredOrigin === 'null') return false
 
     // Allow localhost variants in development
     if (process.env.NODE_ENV === 'development') {
-      const url = new URL(registeredOrigin)
-      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-        const incomingUrl = new URL(origin)
-        if (
-          (incomingUrl.hostname === 'localhost' || incomingUrl.hostname === '127.0.0.1') &&
-          incomingUrl.port === url.port
-        ) {
-          return true
+      try {
+        const url = new URL(registeredOrigin)
+        if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+          const incomingUrl = new URL(origin)
+          if (
+            (incomingUrl.hostname === 'localhost' || incomingUrl.hostname === '127.0.0.1') &&
+            incomingUrl.port === url.port
+          ) {
+            return true
+          }
         }
+      } catch {
+        // Malformed URL — reject
       }
     }
 
@@ -242,10 +251,10 @@ export class PluginBridge {
 
   private handleStateUpdate(message: PluginMessage<StateUpdatePayload>): void {
     const { state } = message.payload
-    // Validate state is not null/undefined and has required type field
-    if (!state || typeof state !== 'object' || !('type' in state)) {
-      this.log('MALFORMED_STATE', 'warning', { note: 'State missing type field' })
-      this.recordFailure('malformed_state', 'STATE_UPDATE missing type field')
+    // Validate state is not null/undefined
+    if (!state || typeof state !== 'object') {
+      this.log('MALFORMED_STATE', 'warning', { note: 'STATE_UPDATE payload.state is null or not an object' })
+      this.recordFailure('malformed_state', 'STATE_UPDATE missing state object')
       return
     }
     // Security: scan string fields for injection patterns
@@ -330,8 +339,10 @@ export class PluginBridge {
       timestamp: Date.now(),
       version: '1.0',
     }
-    // Post to the plugin's registered origin only
-    this.iframeRef.contentWindow.postMessage(message, this.manifest.origin)
+    // srcdoc iframes report origin as the string "null" — browsers reject postMessage(msg, "null").
+    // Use '*' for null-origin plugins; they are already sandboxed by the iframe sandbox attribute.
+    const targetOrigin = this.manifest.origin === 'null' ? '*' : this.manifest.origin
+    this.iframeRef.contentWindow.postMessage(message, targetOrigin)
   }
 
   // ─── Circuit Breaker ────────────────────────────────────────────────────────

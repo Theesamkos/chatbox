@@ -155,8 +155,17 @@ function Root() {
         .catch(() => ({ setting_chatboxai_first: false }) as RemoteConfig)
       setRemoteConfig(async (prev) => ({ ...(await prev), ...remoteConfig }))
 
-      // Skip guide-related checks if already on guide or settings/mcp page
-      if (location.pathname === '/guide' || location.pathname === '/settings/mcp') {
+      // Skip guide-related checks if already on a specific feature page.
+      // This prevents the onboarding redirect from overriding direct navigation
+      // to routes like /k12, /copilots, /guide, /settings/mcp, etc.
+      const isOnSpecificRoute =
+        location.pathname === '/guide' ||
+        location.pathname === '/settings/mcp' ||
+        location.pathname.startsWith('/k12') ||
+        location.pathname.startsWith('/copilots') ||
+        location.pathname.startsWith('/session/') ||
+        location.pathname.startsWith('/task')
+      if (isOnSpecificRoute) {
         initialized.current = true
         return
       }
@@ -212,6 +221,11 @@ function Root() {
 
   useEffect(() => {
     ;(() => {
+      // Only auto-navigate to last session when starting from root path.
+      // If the user navigated directly to a specific route (e.g. /k12, /copilots),
+      // respect that intent and do NOT override it with the startup redirect.
+      // Use location.pathname from TanStack Router (already in scope) for accuracy in SPA.
+      if (location.pathname !== '/' && location.pathname !== '') return
       const { startupPage } = settingsStore.getState()
       const sid = JSON.parse(localStorage.getItem('_currentSessionIdCachedAtom') || '""') as string
       if (sid && startupPage === 'session') {
@@ -221,7 +235,7 @@ function Root() {
         })
       }
     })()
-  }, [])
+  }, [location.pathname])
 
   useEffect(() => {
     if (platform.onNavigate) {
@@ -309,7 +323,11 @@ const creteMantineTheme = (scale = 1) =>
   createTheme({
     /** Put your mantine theme override here */
     scale,
+    fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    fontFamilyMonospace: "source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace",
     primaryColor: 'chatbox-brand',
+    // Override Mantine's default body background with our warm CSS variable
+    other: {},
     colors: {
       'chatbox-brand': colorsTuple(Array.from({ length: 10 }, () => 'var(--chatbox-tint-brand)')),
       'chatbox-gray': colorsTuple(Array.from({ length: 10 }, () => 'var(--chatbox-tint-gray)')),
@@ -588,6 +606,17 @@ export const Route = createRootRoute({
       <MantineProvider
         theme={mantineTheme}
         defaultColorScheme={_theme === Theme.Dark ? 'dark' : _theme === Theme.Light ? 'light' : 'auto'}
+        cssVariablesResolver={(theme) => ({
+          variables: {},
+          light: {
+            '--mantine-color-body': '#FFF8F0',
+            '--mantine-color-default-color': '#3D2B1F',
+          },
+          dark: {
+            '--mantine-color-body': '#1E1410',
+            '--mantine-color-default-color': '#F5EDE0',
+          },
+        })}
       >
         <ThemeProvider theme={theme}>
           <CssBaseline />
