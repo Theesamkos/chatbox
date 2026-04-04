@@ -1,468 +1,1355 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Timeline Builder</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #0f0f0f;
-      color: #e5e5e5;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    #header {
-      padding: 14px 16px 10px;
-      border-bottom: 1px solid #222;
-      flex-shrink: 0;
-    }
-    #topic-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #fff;
-      margin-bottom: 2px;
-    }
-    #instructions {
-      font-size: 11px;
-      color: #666;
-    }
-    #timeline-track {
-      position: relative;
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-    }
-    /* Vertical timeline line */
-    #timeline-track::before {
-      content: '';
-      position: absolute;
-      left: 28px;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-      background: linear-gradient(to bottom, #3b82f6, #8b5cf6);
-      opacity: 0.4;
-    }
-    .event-card {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 10px;
-      padding: 10px 12px;
-      background: #1a1a1a;
-      border: 1px solid #2a2a2a;
-      border-radius: 8px;
-      cursor: grab;
-      transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
-      position: relative;
-      z-index: 1;
-    }
-    .event-card:hover { border-color: #3b82f6; box-shadow: 0 2px 12px rgba(59,130,246,0.15); }
-    .event-card.dragging {
-      opacity: 0.5;
-      cursor: grabbing;
-      transform: scale(0.98);
-    }
-    .event-card.drag-over { border-color: #8b5cf6; background: #1e1a2e; }
-    .event-card.correct { border-color: #34d399; background: #0d2018; }
-    .event-card.incorrect { border-color: #f87171; background: #200d0d; }
-    .drag-handle {
-      color: #444;
-      font-size: 16px;
-      cursor: grab;
-      flex-shrink: 0;
-      padding-top: 2px;
-    }
-    .event-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #3b82f6;
-      flex-shrink: 0;
-      margin-top: 5px;
-    }
-    .event-content { flex: 1; min-width: 0; }
-    .event-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: #e5e5e5;
-      margin-bottom: 2px;
-    }
-    .event-desc {
-      font-size: 11px;
-      color: #666;
-      line-height: 1.4;
-    }
-    .event-year {
-      font-size: 11px;
-      font-weight: 700;
-      color: #888;
-      flex-shrink: 0;
-      padding-top: 3px;
-      display: none; /* Hidden until reveal */
-    }
-    .event-year.revealed { display: block; color: #60a5fa; }
-    .event-card.correct .event-year { color: #34d399; }
-    .event-card.incorrect .event-year { color: #f87171; }
-    #footer {
-      padding: 12px 16px;
-      border-top: 1px solid #222;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    #submit-btn {
-      flex: 1;
-      padding: 9px;
-      background: #3b82f6;
-      color: #fff;
-      border: none;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    #submit-btn:hover { background: #2563eb; }
-    #submit-btn:disabled { background: #333; color: #555; cursor: not-allowed; }
-    #score-display {
-      font-size: 13px;
-      font-weight: 700;
-      color: #34d399;
-      display: none;
-    }
-    #waiting-state {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      color: #555;
-    }
-    #waiting-icon { font-size: 40px; }
-    #waiting-text { font-size: 13px; text-align: center; max-width: 200px; line-height: 1.5; }
-    .keyboard-hint { font-size: 10px; color: #444; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Timeline Builder</title>
+<style>
+/* ─── Reset & Base ──────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #100e0a;
+  --surface:    #181410;
+  --surface2:   #201c16;
+  --border:     #3a3028;
+  --border-hi:  #5a4a38;
+  --text:       #f0ebe0;
+  --text-muted: #a08060;
+  --text-dim:   #5a4a38;
+  --accent:     #f59e0b;
+  --accent-dim: #7c4a00;
+  --success:    #f59e0b;
+  --success-bg: #1f1400;
+  --warn:       #fb923c;
+  --warn-bg:    #1f1000;
+  --error:      #f85149;
+  --error-bg:   #1f0d0d;
+  --radius:     10px;
+  --radius-sm:  6px;
+  --shadow:     0 4px 24px rgba(0,0,0,0.5);
+  --transition: 0.18s cubic-bezier(0.4,0,0.2,1);
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── Layout ────────────────────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ─── Header ────────────────────────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  gap: 12px;
+}
+
+#header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.header-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #1f4f8a 0%, #2f81f7 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+#topic-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#topic-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+#header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ─── Attempt badge ─────────────────────────────────────────────────────── */
+#attempt-badge {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+#attempt-badge.visible { display: flex; }
+
+/* ─── Score badge ───────────────────────────────────────────────────────── */
+#score-badge {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+#score-badge.visible { display: flex; }
+#score-badge.perfect { background: var(--success-bg); border: 1px solid var(--success); color: var(--success); }
+#score-badge.partial  { background: var(--warn-bg);    border: 1px solid var(--warn);    color: var(--warn); }
+#score-badge.poor     { background: var(--error-bg);   border: 1px solid var(--error);   color: var(--error); }
+
+/* ─── Buttons ───────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition), transform var(--transition);
+  font-family: inherit;
+  white-space: nowrap;
+  min-height: 34px;
+  user-select: none;
+}
+.btn:active:not(:disabled) { transform: scale(0.97); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover:not(:disabled) { background: #388bfd; }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--surface2); color: var(--text); border-color: var(--border-hi); }
+
+.btn-success { background: var(--success); color: #0d1117; }
+.btn-success:hover:not(:disabled) { background: #56d364; }
+
+.btn-sm { padding: 5px 10px; font-size: 12px; min-height: 28px; }
+
+/* ─── Empty / loading state ─────────────────────────────────────────────── */
+#empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+
+#empty-state .empty-icon {
+  font-size: 48px;
+  opacity: 0.4;
+}
+
+#empty-state h2 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+#empty-state p {
+  font-size: 13px;
+  color: var(--text-muted);
+  max-width: 280px;
+}
+
+/* ─── Topic picker ──────────────────────────────────────────────────────── */
+#topic-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 340px;
+}
+
+#topic-picker label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+#topic-select {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%237d8590' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+#topic-select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+#topic-select option { background: var(--surface2); }
+
+/* ─── Activity area ─────────────────────────────────────────────────────── */
+#activity-area {
+  display: none;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+#activity-area.visible { display: flex; }
+
+/* ─── Instruction bar ───────────────────────────────────────────────────── */
+#instruction-bar {
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#instruction-text {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+#instruction-text strong {
+  color: var(--text);
+}
+
+/* ─── Card list ─────────────────────────────────────────────────────────── */
+#card-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+#card-scroll::-webkit-scrollbar { width: 6px; }
+#card-scroll::-webkit-scrollbar-track { background: transparent; }
+#card-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+#card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 100%;
+}
+
+/* ─── Event card ────────────────────────────────────────────────────────── */
+.event-card {
+  display: flex;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: grab;
+  transition:
+    border-color var(--transition),
+    box-shadow var(--transition),
+    opacity var(--transition),
+    transform var(--transition),
+    background var(--transition);
+  position: relative;
+  user-select: none;
+  overflow: hidden;
+}
+
+.event-card:hover:not(.submitted-card) {
+  border-color: var(--border-hi);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+}
+
+.event-card.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+  box-shadow: var(--shadow);
+  transform: scale(1.01);
+  z-index: 10;
+}
+
+.event-card.drag-over-top {
+  border-top: 2px solid var(--accent);
+}
+
+.event-card.drag-over-bottom {
+  border-bottom: 2px solid var(--accent);
+}
+
+.event-card.correct {
+  border-color: var(--success);
+  background: var(--success-bg);
+}
+
+.event-card.incorrect {
+  border-color: var(--error);
+  background: var(--error-bg);
+}
+
+.event-card.submitted-card {
+  cursor: default;
+}
+
+/* Position number */
+.card-position {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-width: 36px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: var(--surface2);
+  border-right: 1px solid var(--border);
+  transition: color var(--transition), background var(--transition);
+}
+
+.event-card.correct .card-position {
+  background: rgba(63,185,80,0.15);
+  color: var(--success);
+  border-color: var(--success);
+}
+
+.event-card.incorrect .card-position {
+  background: rgba(248,81,73,0.15);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* Drag handle */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  padding: 0 8px 0 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+  cursor: grab;
+  flex-shrink: 0;
+  transition: color var(--transition);
+}
+.event-card:hover .drag-handle { color: var(--text-muted); }
+.submitted-card .drag-handle { cursor: default; }
+
+/* Card body */
+.card-body {
+  flex: 1;
+  padding: 10px 12px 10px 0;
+  min-width: 0;
+}
+
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.3;
+  margin-bottom: 3px;
+}
+
+.card-description {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Card right: year + status icon */
+.card-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 8px 12px;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.card-year {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(47,129,247,0.12);
+  padding: 2px 7px;
+  border-radius: 10px;
+  display: none;
+  white-space: nowrap;
+}
+.card-year.visible { display: block; }
+
+.card-status-icon {
+  font-size: 16px;
+  display: none;
+  line-height: 1;
+}
+.card-status-icon.visible { display: block; }
+
+/* ─── Drop indicator ────────────────────────────────────────────────────── */
+.drop-indicator {
+  height: 3px;
+  background: var(--accent);
+  border-radius: 2px;
+  margin: -4px 0;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+}
+.drop-indicator.active { opacity: 1; }
+
+/* ─── Footer / action bar ───────────────────────────────────────────────── */
+#action-bar {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#status-msg {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+  min-width: 0;
+}
+
+#status-msg.success { color: var(--success); }
+#status-msg.warn    { color: var(--warn); }
+#status-msg.error   { color: var(--error); }
+
+/* ─── Result overlay ────────────────────────────────────────────────────── */
+#result-overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(13,17,23,0.85);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.25s ease;
+}
+#result-overlay.visible { display: flex; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+#result-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 28px 24px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+#result-emoji {
+  font-size: 48px;
+  margin-bottom: 12px;
+  display: block;
+}
+
+#result-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+#result-title.perfect { color: var(--success); }
+#result-title.partial  { color: var(--warn); }
+#result-title.poor     { color: var(--error); }
+
+#result-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+#result-score-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.score-pip {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.3s;
+}
+.score-pip.correct  { border-color: var(--success); background: var(--success-bg); color: var(--success); }
+.score-pip.incorrect { border-color: var(--error); background: var(--error-bg); color: var(--error); }
+
+#result-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+/* ─── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #header { padding: 10px 12px; }
+  #card-scroll { padding: 10px 12px; }
+  #action-bar { padding: 10px 12px; }
+  .card-description { display: none; }
+  .card-body { padding: 10px 8px 10px 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+}
+</style>
 </head>
 <body>
-  <div id="header">
-    <div id="topic-title">Timeline Builder</div>
-    <div id="instructions">Ask the AI to load a topic to begin</div>
-  </div>
+<div id="app">
 
-  <div id="timeline-track">
-    <div id="waiting-state">
-      <div id="waiting-icon">📅</div>
-      <div id="waiting-text">Ask the AI to load a historical topic and arrange the events in order</div>
+  <!-- Header -->
+  <div id="header">
+    <div id="header-left">
+      <div class="header-icon">📅</div>
+      <div>
+        <div id="topic-label">Timeline Builder</div>
+        <div id="topic-subtitle">Arrange events in chronological order</div>
+      </div>
+    </div>
+    <div id="header-right">
+      <div id="attempt-badge">
+        <span>🔄</span>
+        <span id="attempt-count">1</span>
+      </div>
+      <div id="score-badge">
+        <span id="score-text"></span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="reset-btn" onclick="handleReset()" style="display:none">
+        ↺ Reset
+      </button>
     </div>
   </div>
 
-  <div id="footer">
-    <button id="submit-btn" disabled>Submit Order</button>
-    <div id="score-display"></div>
+  <!-- Empty state -->
+  <div id="empty-state">
+    <div class="empty-icon">📅</div>
+    <h2>Timeline Builder</h2>
+    <p>Ask your AI tutor to load a history topic, or pick one below to get started.</p>
+    <div id="topic-picker">
+      <label for="topic-select">Choose a topic</label>
+      <select id="topic-select" aria-label="Select a history topic">
+        <option value="">-- Select a topic --</option>
+        <option value="American Civil War">American Civil War</option>
+        <option value="American Revolution">American Revolution</option>
+        <option value="Ancient Rome">Ancient Rome</option>
+        <option value="World War II">World War II</option>
+        <option value="Space Race">Space Race</option>
+        <option value="French Revolution">French Revolution</option>
+        <option value="Cold War">Cold War</option>
+        <option value="Industrial Revolution">Industrial Revolution</option>
+      </select>
+      <button class="btn btn-primary" id="load-btn" onclick="handleLoadTopic()">Load Topic</button>
+    </div>
   </div>
 
-  <script>
-    // ─── State ────────────────────────────────────────────────────────────────
-    let sessionId = null
-    let events = []
-    let topic = ''
-    let submitted = false
-    let dragSrcIdx = null
+  <!-- Activity area -->
+  <div id="activity-area">
+    <div id="instruction-bar">
+      <div id="instruction-text">
+        <strong>Drag</strong> the cards to arrange them in chronological order, then tap <strong>Submit</strong>.
+      </div>
+    </div>
+    <div id="card-scroll">
+      <div id="card-list" role="list" aria-label="Timeline events to arrange"></div>
+    </div>
+    <div id="action-bar">
+      <div id="status-msg"></div>
+      <button class="btn btn-success" id="submit-btn" onclick="handleSubmit()" disabled>
+        ✓ Submit
+      </button>
+    </div>
+  </div>
 
-    // ─── Plugin Protocol ──────────────────────────────────────────────────────
-    function sendMessage(type, payload) {
-      window.parent.postMessage({
-        type, pluginId: 'timeline', sessionId,
-        payload, timestamp: Date.now(), version: '1.0'
-      }, '*')
+  <!-- Result overlay -->
+  <div id="result-overlay" role="dialog" aria-modal="true" aria-labelledby="result-title">
+    <div id="result-card">
+      <span id="result-emoji"></span>
+      <div id="result-title"></div>
+      <div id="result-subtitle"></div>
+      <div id="result-score-row"></div>
+      <div id="result-actions">
+        <button class="btn btn-ghost" onclick="closeOverlay()">Review</button>
+        <button class="btn btn-primary" id="overlay-try-again" onclick="handleTryAgain()" style="display:none">Try Again</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+
+// ─── Topic data ─────────────────────────────────────────────────────────────
+const TOPICS = {
+  "American Civil War": [
+    { id: "acw1", title: "Battle of Fort Sumter",      year: 1861, description: "Confederate forces attack the Union garrison, starting the Civil War." },
+    { id: "acw2", title: "Emancipation Proclamation",  year: 1863, description: "Lincoln declares enslaved people in Confederate states to be free." },
+    { id: "acw3", title: "Battle of Gettysburg",       year: 1863, description: "Three-day battle that turned the tide in favor of the Union." },
+    { id: "acw4", title: "Sherman's March to the Sea", year: 1864, description: "Union forces sweep through Georgia, destroying Confederate infrastructure." },
+    { id: "acw5", title: "Surrender at Appomattox",    year: 1865, description: "Lee surrenders to Grant, effectively ending the Civil War." },
+    { id: "acw6", title: "13th Amendment Ratified",    year: 1865, description: "Constitutional amendment abolishing slavery throughout the United States." }
+  ],
+  "American Revolution": [
+    { id: "ar1", title: "Boston Massacre",                  year: 1770, description: "British soldiers kill five colonists, fueling anti-British sentiment." },
+    { id: "ar2", title: "Boston Tea Party",                 year: 1773, description: "Colonists dump British tea into Boston Harbor to protest taxation." },
+    { id: "ar3", title: "Battles of Lexington and Concord", year: 1775, description: "First military engagements of the Revolutionary War." },
+    { id: "ar4", title: "Declaration of Independence",      year: 1776, description: "The thirteen colonies formally declare independence from Britain." },
+    { id: "ar5", title: "Winter at Valley Forge",           year: 1777, description: "Continental Army endures brutal winter, emerging stronger and more disciplined." },
+    { id: "ar6", title: "Treaty of Paris",                  year: 1783, description: "Britain recognizes American independence, ending the Revolutionary War." }
+  ],
+  "Ancient Rome": [
+    { id: "rome1", title: "Assassination of Julius Caesar",  year: -44,  description: "Caesar is killed by senators on the Ides of March, triggering civil war." },
+    { id: "rome2", title: "Augustus Becomes First Emperor",  year: -27,  description: "Octavian becomes Augustus, founding the Roman Empire." },
+    { id: "rome3", title: "Eruption of Mount Vesuvius",      year: 79,   description: "Pompeii and Herculaneum are buried under volcanic ash." },
+    { id: "rome4", title: "Colosseum Completed",             year: 80,   description: "The Flavian Amphitheatre opens, seating 50,000 spectators." },
+    { id: "rome5", title: "Constantine's Conversion",        year: 312,  description: "Emperor Constantine converts to Christianity, transforming the Empire." },
+    { id: "rome6", title: "Fall of the Western Roman Empire",year: 476,  description: "Odoacer deposes Romulus Augustulus, ending Western Rome." }
+  ],
+  "World War II": [
+    { id: "ww2_1", title: "Germany Invades Poland",    year: 1939, description: "Nazi Germany launches a blitzkrieg invasion, triggering declarations of war." },
+    { id: "ww2_2", title: "Battle of Britain",         year: 1940, description: "The RAF defeats the Luftwaffe, preventing a German invasion of Britain." },
+    { id: "ww2_3", title: "Attack on Pearl Harbor",    year: 1941, description: "Japan's surprise attack brings the United States into the war." },
+    { id: "ww2_4", title: "D-Day Invasion",            year: 1944, description: "Allied forces land at Normandy in the largest seaborne invasion in history." },
+    { id: "ww2_5", title: "V-E Day",                   year: 1945, description: "Germany surrenders unconditionally, ending the war in Europe." },
+    { id: "ww2_6", title: "Atomic Bombs on Japan",     year: 1945, description: "The US drops atomic bombs on Hiroshima and Nagasaki, ending the Pacific war." }
+  ],
+  "Space Race": [
+    { id: "space1", title: "Sputnik Launch",           year: 1957, description: "The Soviet Union launches the first artificial Earth satellite." },
+    { id: "space2", title: "Yuri Gagarin in Orbit",    year: 1961, description: "Gagarin becomes the first human in space, orbiting Earth once." },
+    { id: "space3", title: "John Glenn Orbits Earth",  year: 1962, description: "Glenn becomes the first American to orbit Earth." },
+    { id: "space4", title: "Apollo 1 Fire",            year: 1967, description: "A cabin fire kills three astronauts, setting back the moon program." },
+    { id: "space5", title: "Apollo 11 Moon Landing",   year: 1969, description: "Armstrong and Aldrin become the first humans to walk on the Moon." },
+    { id: "space6", title: "Apollo 13 Crisis",         year: 1970, description: "An explosion cripples the spacecraft; crew survives through improvisation." }
+  ],
+  "French Revolution": [
+    { id: "fr1", title: "Estates-General Convened",    year: 1789, description: "Louis XVI convenes the Estates-General for the first time since 1614." },
+    { id: "fr2", title: "Storming of the Bastille",    year: 1789, description: "Parisian crowds storm the Bastille prison, symbolizing the revolution's start." },
+    { id: "fr3", title: "Declaration of Rights of Man",year: 1789, description: "The National Assembly adopts foundational principles of liberty and equality." },
+    { id: "fr4", title: "Execution of Louis XVI",      year: 1793, description: "King Louis XVI is guillotined, marking the radical phase of the Revolution." },
+    { id: "fr5", title: "Reign of Terror",             year: 1794, description: "Robespierre's Committee of Public Safety executes thousands of enemies." },
+    { id: "fr6", title: "Napoleon's Coup (18 Brumaire)",year: 1799, description: "Napoleon overthrows the Directory, ending the Revolution and beginning his rule." }
+  ],
+  "Cold War": [
+    { id: "cw1", title: "Berlin Blockade",             year: 1948, description: "Soviets blockade West Berlin; Allies respond with a massive airlift." },
+    { id: "cw2", title: "Korean War Begins",           year: 1950, description: "North Korea invades the South, drawing in US and UN forces." },
+    { id: "cw3", title: "Cuban Missile Crisis",        year: 1962, description: "13-day standoff over Soviet missiles in Cuba brings the world to the brink." },
+    { id: "cw4", title: "Moon Landing",                year: 1969, description: "Apollo 11 lands on the Moon, a decisive victory in the Space Race." },
+    { id: "cw5", title: "Fall of the Berlin Wall",     year: 1989, description: "East Germany opens the Berlin Wall, symbolizing the end of the Cold War." },
+    { id: "cw6", title: "Dissolution of the Soviet Union", year: 1991, description: "The USSR officially dissolves, ending the Cold War era." }
+  ],
+  "Industrial Revolution": [
+    { id: "ir1", title: "Spinning Jenny Invented",     year: 1764, description: "Hargreaves' multi-spindle machine revolutionizes textile production." },
+    { id: "ir2", title: "Watt's Steam Engine",         year: 1769, description: "James Watt patents an improved steam engine, powering factories and transport." },
+    { id: "ir3", title: "First Steam Locomotive",      year: 1804, description: "Trevithick's locomotive hauls iron at Merthyr Tydfil, Wales." },
+    { id: "ir4", title: "Luddite Riots",               year: 1811, description: "Workers smash textile machinery fearing job losses from automation." },
+    { id: "ir5", title: "First Public Railway",        year: 1825, description: "The Stockton and Darlington Railway opens, the world's first public steam railway." },
+    { id: "ir6", title: "Great Exhibition",            year: 1851, description: "London's Crystal Palace showcases industrial achievements from around the world." }
+  ]
+};
+
+// ─── Plugin bridge state ──────────────────────────────────────────────────────
+let sessionId = null;
+let pluginId = 'timeline';
+let conversationId = null;
+let registeredOrigin = null;
+
+// ─── API proxy via postMessage (sandboxed iframe cannot fetch directly) ────────
+const pendingProxyRequests = new Map();
+let proxyRequestCounter = 0;
+
+function proxyFetch(url, options) {
+  return new Promise(function(resolve, reject) {
+    const requestId = 'tl-proxy-' + (++proxyRequestCounter);
+    const timeout = setTimeout(function() {
+      pendingProxyRequests.delete(requestId);
+      reject(new Error('Proxy request timed out'));
+    }, 15000);
+    pendingProxyRequests.set(requestId, { resolve, reject, timeout });
+    window.parent.postMessage({
+      type: 'API_PROXY_REQUEST',
+      version: 1,
+      sessionId,
+      pluginId,
+      requestId,
+      url,
+      method: (options && options.method) || 'GET',
+      body: (options && options.body) || null,
+      headers: (options && options.headers) || null,
+    }, '*');
+  });
+}
+
+// Handle proxy responses from parent
+window.addEventListener('message', function(event) {
+  if (!event.data || event.data.type !== 'API_PROXY_RESPONSE') return;
+  const msg = event.data;
+  const pending = pendingProxyRequests.get(msg.requestId);
+  if (!pending) return;
+  clearTimeout(pending.timeout);
+  pendingProxyRequests.delete(msg.requestId);
+  if (msg.ok) {
+    pending.resolve(msg.data);
+  } else {
+    pending.reject(new Error('Proxy error ' + msg.status));
+  }
+});
+
+// ─── App state ────────────────────────────────────────────────────────────────
+let currentTopic = null;
+let currentEvents = [];   // student's current ordering
+let correctOrder = [];    // sorted by year (ground truth)
+let liveTopicsCache = {}; // live events fetched from Wikipedia via server
+let submitted = false;
+let attemptCount = 0;
+let lastValidationResult = null;
+
+// ─── Drag state ───────────────────────────────────────────────────────────────
+let dragSrcIdx = null;
+let dragOverIdx = null;
+let dragOverHalf = null; // 'top' | 'bottom'
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatYear(y) {
+  if (y < 0) return Math.abs(y) + ' BCE';
+  return y + ' CE';
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  const correct = [...arr].sort((x, y) => x.year - y.year);
+  if (a.length > 1 && JSON.stringify(a.map(e=>e.id)) === JSON.stringify(correct.map(e=>e.id))) {
+    [a[0], a[1]] = [a[1], a[0]];
+  }
+  return a;
+}
+
+// ─── Deterministic validation (CORE — no LLM) ────────────────────────────────
+function validateArrangement() {
+  const studentIds = currentEvents.map(e => e.id);
+  const correctIds = correctOrder.map(e => e.id);
+
+  const perItemCorrectness = {};
+  studentIds.forEach(function(id, idx) {
+    perItemCorrectness[id] = correctIds[idx] === id;
+  });
+
+  const score = Object.values(perItemCorrectness).filter(Boolean).length;
+  const total = correctIds.length;
+  const pct = score / total;
+
+  let status;
+  if (pct === 1)       status = 'correct';
+  else if (pct >= 0.5) status = 'partial';
+  else                 status = 'incorrect';
+
+  return {
+    status,
+    score,
+    total,
+    pct,
+    perItemCorrectness,
+    correctOrder: correctOrder.map(e => ({ id: e.id, title: e.title, year: e.year })),
+    studentOrder: studentIds,
+    topic: currentTopic,
+    attemptCount,
+  };
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────────
+function renderCards(revealYears, feedback) {
+  const list = document.getElementById('card-list');
+  list.innerHTML = '';
+
+  currentEvents.forEach(function(event, idx) {
+    // Drop indicator above card
+    const indicator = document.createElement('div');
+    indicator.className = 'drop-indicator';
+    indicator.dataset.dropIdx = idx;
+    indicator.dataset.dropPos = 'before';
+    list.appendChild(indicator);
+
+    const card = document.createElement('div');
+    card.className = 'event-card' + (submitted ? ' submitted-card' : '');
+    card.dataset.id = event.id;
+    card.dataset.idx = idx;
+    card.draggable = !submitted;
+    card.setAttribute('role', 'listitem');
+    card.setAttribute('aria-label', event.title);
+
+    if (feedback) {
+      card.classList.add(feedback[event.id] ? 'correct' : 'incorrect');
     }
 
-    function sendStateUpdate(status) {
-      sendMessage('STATE_UPDATE', {
-        state: {
-          type: 'timeline',
+    const yearHtml = `<span class="card-year${revealYears ? ' visible' : ''}">${escHtml(formatYear(event.year))}</span>`;
+    const iconHtml = feedback
+      ? `<span class="card-status-icon visible">${feedback[event.id] ? '✓' : '✗'}</span>`
+      : '';
+
+    card.innerHTML =
+      `<div class="card-position">${idx + 1}</div>` +
+      `<div class="drag-handle" aria-hidden="true">⠿</div>` +
+      `<div class="card-body">` +
+        `<div class="card-title">${escHtml(event.title)}</div>` +
+        `<div class="card-description">${escHtml(event.description)}</div>` +
+      `</div>` +
+      `<div class="card-right">${yearHtml}${iconHtml}</div>`;
+
+    if (!submitted) {
+      card.addEventListener('dragstart', onDragStart);
+      card.addEventListener('dragend',   onDragEnd);
+      card.addEventListener('dragover',  onDragOver);
+      card.addEventListener('dragenter', onDragEnter);
+      card.addEventListener('dragleave', onDragLeave);
+      card.addEventListener('drop',      onDrop);
+    }
+
+    list.appendChild(card);
+  });
+
+  // Final drop indicator (after last card)
+  const finalIndicator = document.createElement('div');
+  finalIndicator.className = 'drop-indicator';
+  finalIndicator.dataset.dropIdx = currentEvents.length;
+  finalIndicator.dataset.dropPos = 'after';
+  list.appendChild(finalIndicator);
+
+  document.getElementById('submit-btn').disabled = submitted || currentEvents.length === 0;
+}
+
+function updateHeaderBadges() {
+  const attemptBadge = document.getElementById('attempt-badge');
+  const scoreBadge = document.getElementById('score-badge');
+
+  if (attemptCount > 0) {
+    attemptBadge.classList.add('visible');
+    document.getElementById('attempt-count').textContent = 'Attempt ' + attemptCount;
+  } else {
+    attemptBadge.classList.remove('visible');
+  }
+
+  if (lastValidationResult) {
+    const r = lastValidationResult;
+    scoreBadge.classList.add('visible');
+    scoreBadge.className = 'score-badge visible ' + (r.status === 'correct' ? 'perfect' : r.status === 'partial' ? 'partial' : 'poor');
+    document.getElementById('score-text').textContent = r.score + '/' + r.total;
+  } else {
+    scoreBadge.classList.remove('visible');
+  }
+}
+
+// ─── Drag and Drop ────────────────────────────────────────────────────────────
+function onDragStart(e) {
+  dragSrcIdx = parseInt(e.currentTarget.dataset.idx);
+  e.currentTarget.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', String(dragSrcIdx));
+}
+
+function onDragEnd(e) {
+  e.currentTarget.classList.remove('dragging');
+  document.querySelectorAll('.event-card').forEach(c => {
+    c.classList.remove('drag-over-top', 'drag-over-bottom');
+  });
+  document.querySelectorAll('.drop-indicator').forEach(d => d.classList.remove('active'));
+  dragSrcIdx = null;
+  dragOverIdx = null;
+  dragOverHalf = null;
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const half = (e.clientY - rect.top) < (rect.height / 2) ? 'top' : 'bottom';
+  const idx = parseInt(card.dataset.idx);
+
+  if (idx !== dragOverIdx || half !== dragOverHalf) {
+    dragOverIdx = idx;
+    dragOverHalf = half;
+    document.querySelectorAll('.event-card').forEach(c => c.classList.remove('drag-over-top','drag-over-bottom'));
+    card.classList.add(half === 'top' ? 'drag-over-top' : 'drag-over-bottom');
+  }
+}
+
+function onDragEnter(e) { e.preventDefault(); }
+
+function onDragLeave(e) {
+  if (!e.currentTarget.contains(e.relatedTarget)) {
+    e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
+  }
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  const targetIdx = parseInt(e.currentTarget.dataset.idx);
+  const rect = e.currentTarget.getBoundingClientRect();
+  const insertAfter = (e.clientY - rect.top) >= (rect.height / 2);
+
+  if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+
+  const moved = currentEvents.splice(dragSrcIdx, 1)[0];
+  let insertAt = insertAfter ? targetIdx : targetIdx;
+  if (dragSrcIdx < targetIdx) {
+    insertAt = insertAfter ? targetIdx : targetIdx - 1;
+  } else {
+    insertAt = insertAfter ? targetIdx + 1 : targetIdx;
+  }
+  // Clamp
+  insertAt = Math.max(0, Math.min(insertAt, currentEvents.length));
+  currentEvents.splice(insertAt, 0, moved);
+
+  e.currentTarget.classList.remove('drag-over-top','drag-over-bottom');
+  renderCards(false, null);
+  sendStateUpdate();
+}
+
+// ─── Activity logic ────────────────────────────────────────────────────────// ─── Live API fetch (Wikipedia via server, proxied through parent) ─────────────────────
+async function fetchLiveTopicEvents(topicName) {
+  if (liveTopicsCache[topicName]) return liveTopicsCache[topicName];
+  try {
+    const url = '/api/trpc/timeline.getEvents?batch=1&input=' +
+      encodeURIComponent(JSON.stringify({ '0': { json: { topic: topicName } } }));
+    // Use proxyFetch since sandboxed iframes cannot fetch() directly
+    const data = await proxyFetch(url);
+    const result = data?.[0]?.result?.data?.json;
+    if (!result || !Array.isArray(result.events) || result.events.length < 4) return null;
+    liveTopicsCache[topicName] = result.events;
+    return result.events;
+  } catch (e) {
+    console.warn('[Timeline] Live fetch failed for "' + topicName + '":', e);
+    return null;
+  }
+}
+
+function loadTopic(topicName, restoredOrder) {
+  const events = liveTopicsCache[topicName] || TOPICS[topicName];
+  if (!events) return false;
+
+  currentTopic = topicName;
+  submitted = false;
+  lastValidationResult = null;
+  correctOrder = [...events].sort((a, b) => a.year - b.year);
+
+  if (restoredOrder && Array.isArray(restoredOrder) && restoredOrder.length === events.length) {
+    const byId = {};
+    events.forEach(e => { byId[e.id] = e; });
+    const restored = restoredOrder.map(id => byId[id]).filter(Boolean);
+    currentEvents = restored.length === events.length ? restored : shuffle(events);
+  } else {
+    currentEvents = shuffle(events);
+  }
+
+  // Update header
+  document.getElementById('topic-label').textContent = topicName;
+  document.getElementById('topic-subtitle').textContent = 'Arrange ' + events.length + ' events in chronological order';
+
+  // Show activity
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('activity-area').classList.add('visible');
+  document.getElementById('reset-btn').style.display = 'block';
+  document.getElementById('result-overlay').classList.remove('visible');
+  document.getElementById('status-msg').textContent = '';
+  document.getElementById('status-msg').className = '';
+
+  renderCards(false, null);
+  updateHeaderBadges();
+  return true;
+}
+
+async function handleLoadTopic() {
+  const sel = document.getElementById('topic-select').value;
+  if (!sel) {
+    document.getElementById('status-msg').textContent = 'Please select a topic first.';
+    return;
+  }
+  setStatus('Loading events…', '');
+  const liveEvents = await fetchLiveTopicEvents(sel);
+  if (liveEvents) liveTopicsCache[sel] = liveEvents;
+  attemptCount = 0;
+  const ok = loadTopic(sel, null);
+  if (ok) {
+    const isLive = !!(liveTopicsCache[sel] && liveTopicsCache[sel] !== TOPICS[sel]);
+    setStatus('Drag the cards to put them in the correct order.' + (isLive ? ' • Live data' : ''), '');
+    sendStateUpdate();
+  }
+}
+
+function handleSubmit() {
+  if (!currentTopic || submitted) return;
+  submitted = true;
+  attemptCount++;
+
+  const result = validateArrangement();
+  lastValidationResult = result;
+
+  renderCards(true, result.perItemCorrectness);
+  updateHeaderBadges();
+  sendStateUpdate();
+
+  // Show result overlay
+  showResultOverlay(result);
+
+  // Emit completion
+  sendPluginComplete(result);
+}
+
+function handleTryAgain() {
+  if (!currentTopic) return;
+  const topic = currentTopic;
+  closeOverlay();
+  loadTopic(topic, null);
+  setStatus('Try again — rearrange the events.', '');
+  sendStateUpdate();
+}
+
+function handleReset() {
+  if (!currentTopic) return;
+  const topic = currentTopic;
+  attemptCount = 0;
+  loadTopic(topic, null);
+  setStatus('Reset. Drag the cards to arrange them.', '');
+  sendStateUpdate();
+}
+
+function closeOverlay() {
+  document.getElementById('result-overlay').classList.remove('visible');
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status-msg');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+function showResultOverlay(result) {
+  const overlay = document.getElementById('result-overlay');
+  const emoji   = document.getElementById('result-emoji');
+  const title   = document.getElementById('result-title');
+  const sub     = document.getElementById('result-subtitle');
+  const scoreRow= document.getElementById('result-score-row');
+  const tryBtn  = document.getElementById('overlay-try-again');
+
+  if (result.status === 'correct') {
+    emoji.textContent = '🎉';
+    title.textContent = 'Perfect!';
+    title.className = 'perfect';
+    sub.textContent = 'All ' + result.total + ' events in the correct chronological order!';
+    tryBtn.style.display = 'none';
+  } else if (result.status === 'partial') {
+    emoji.textContent = '👍';
+    title.textContent = result.score + ' of ' + result.total + ' Correct';
+    title.className = 'partial';
+    sub.textContent = 'Good effort! Review the highlighted cards and try again.';
+    tryBtn.style.display = 'inline-flex';
+  } else {
+    emoji.textContent = '📚';
+    title.textContent = result.score + ' of ' + result.total + ' Correct';
+    title.className = 'poor';
+    sub.textContent = 'Keep studying! The correct order is now revealed below.';
+    tryBtn.style.display = 'inline-flex';
+  }
+
+  // Score pips
+  scoreRow.innerHTML = '';
+  result.studentOrder.forEach(function(id) {
+    const pip = document.createElement('div');
+    pip.className = 'score-pip ' + (result.perItemCorrectness[id] ? 'correct' : 'incorrect');
+    pip.textContent = result.perItemCorrectness[id] ? '✓' : '✗';
+    scoreRow.appendChild(pip);
+  });
+
+  overlay.classList.add('visible');
+}
+
+// ─── postMessage protocol (chatbridge-electron v1.0) ─────────────────────────
+function sendMsg(type, payload) {
+  if (!registeredOrigin) return;
+  const msg = { type, pluginId, sessionId, payload, timestamp: Date.now(), version: '1.0' };
+  window.parent.postMessage(msg, registeredOrigin);
+}
+
+function sendStateUpdate() {
+  if (!currentTopic) return;
+  sendMsg('STATE_UPDATE', { state: buildState() });
+}
+
+function buildState() {
+  return {
+    topic: currentTopic,
+    orderedEventIds: currentEvents.map(e => e.id),
+    submitted,
+    attemptCount,
+    validationStatus: lastValidationResult ? lastValidationResult.status : null,
+    score: lastValidationResult ? lastValidationResult.score : null,
+    total: lastValidationResult ? lastValidationResult.total : null,
+    completionStatus: submitted && lastValidationResult ? 'TIMELINE_COMPLETE' : 'in_progress',
+  };
+}
+
+function sendPluginComplete(result) {
+  const summary = 'Student completed the ' + currentTopic + ' timeline. ' +
+    'Score: ' + result.score + '/' + result.total + ' (' +
+    (result.status === 'correct' ? 'perfect' : result.status) + '). ' +
+    'Attempt #' + result.attemptCount + '.';
+  sendMsg('PLUGIN_COMPLETE', {
+    reason: summary,
+    finalState: {
+      ...buildState(),
+      correctOrder: result.correctOrder,
+      perItemCorrectness: result.perItemCorrectness,
+    },
+  });
+}
+
+function sendToolResult(toolCallId, result, isError) {
+  sendMsg('TOOL_RESULT', {
+    toolCallId,
+    result,
+    error: isError ? (result && result.error ? result.error : 'Tool error') : null,
+  });
+}
+
+function handleToolInvoke(msg) {
+  const { toolName, toolCallId, arguments: args } = msg;
+
+  try {
+    switch (toolName) {
+
+      case 'load_timeline': {
+        const topic = args && args.topic;
+        if (!topic) {
+          sendToolResult(toolCallId, { error: 'Missing required argument: topic' }, true);
+          return;
+        }
+        if (!TOPICS[topic] && !liveTopicsCache[topic]) {
+          sendToolResult(toolCallId, {
+            error: 'Topic not found: ' + topic,
+            availableTopics: Object.keys(TOPICS),
+          }, true);
+          return;
+        }
+        // Fetch live events from Wikipedia (via server), fall back to curated
+        fetchLiveTopicEvents(topic).then(function(liveEvents) {
+          if (liveEvents) liveTopicsCache[topic] = liveEvents;
+          attemptCount = 0;
+          loadTopic(topic, null);
+          setStatus('Topic loaded. Drag the cards to arrange them.', '');
+          sendStateUpdate();
+          sendToolResult(toolCallId, {
+            topic,
+            source: liveEvents ? 'wikipedia' : 'curated',
+            eventCount: currentEvents.length,
+            events: currentEvents.map(e => ({ id: e.id, title: e.title, description: e.description })),
+            message: 'Timeline loaded for "' + topic + '". The student can now arrange ' + currentEvents.length + ' events.',
+          }, false);
+        }).catch(function(err) {
+          console.error('[Timeline] load_timeline error:', err);
+          attemptCount = 0;
+          loadTopic(topic, null);
+          setStatus('Topic loaded. Drag the cards to arrange them.', '');
+          sendStateUpdate();
+          sendToolResult(toolCallId, {
+            topic,
+            source: 'curated',
+            eventCount: currentEvents.length,
+            events: currentEvents.map(e => ({ id: e.id, title: e.title, description: e.description })),
+            message: 'Timeline loaded for "' + topic + '" (curated). The student can now arrange ' + currentEvents.length + ' events.',
+          }, false);
+        });
+        return; // async — do not fall through to break
+      }
+
+      case 'validate_arrangement': {
+        if (!currentTopic) {
+          sendToolResult(toolCallId, { error: 'No topic loaded. Call load_timeline first.' }, true);
+          return;
+        }
+        if (submitted) {
+          // Already submitted — return the stored result
+          sendToolResult(toolCallId, lastValidationResult, false);
+          return;
+        }
+        submitted = true;
+        attemptCount++;
+        const result = validateArrangement();
+        lastValidationResult = result;
+        renderCards(true, result.perItemCorrectness);
+        updateHeaderBadges();
+        sendStateUpdate();
+        showResultOverlay(result);
+        sendPluginComplete(result);
+        sendToolResult(toolCallId, result, false);
+        break;
+      }
+
+      case 'get_state': {
+        if (!currentTopic) {
+          sendToolResult(toolCallId, { loaded: false, message: 'No topic loaded.' }, false);
+          return;
+        }
+        sendToolResult(toolCallId, {
+          loaded: true,
+          ...buildState(),
+          availableTopics: Object.keys(TOPICS),
+          liveTopicsLoaded: Object.keys(liveTopicsCache),
+        }, false);
+        break;
+      }
+
+      case 'reset_timeline': {
+        if (!currentTopic) {
+          sendToolResult(toolCallId, { error: 'No topic loaded. Call load_timeline first.' }, true);
+          return;
+        }
+        const topic = currentTopic;
+        attemptCount = 0;
+        loadTopic(topic, null);
+        setStatus('Timeline reset. Drag the cards to arrange them.', '');
+        sendStateUpdate();
+        sendToolResult(toolCallId, {
           topic,
-          events: events.map(e => ({ ...e, placed: true })),
-          status,
-          studentOrder: events.map(e => e.id),
-          correctOrder: [...events].sort((a, b) => a.year - b.year).map(e => e.id)
-        }
-      })
-    }
-
-    // ─── Render ───────────────────────────────────────────────────────────────
-    function renderTimeline(showResults = false, perItemCorrectness = {}) {
-      const track = document.getElementById('timeline-track')
-      const waiting = document.getElementById('waiting-state')
-
-      if (events.length === 0) {
-        waiting.style.display = 'flex'
-        return
-      }
-      waiting.style.display = 'none'
-      track.innerHTML = ''
-
-      events.forEach((evt, idx) => {
-        const card = document.createElement('div')
-        card.className = 'event-card'
-        card.draggable = !submitted
-        card.dataset.idx = idx
-        card.setAttribute('tabindex', '0')
-        card.setAttribute('role', 'listitem')
-        card.setAttribute('aria-label', `${evt.name}, drag to reorder`)
-
-        if (showResults) {
-          const correct = perItemCorrectness[evt.id]
-          card.classList.add(correct ? 'correct' : 'incorrect')
-        }
-
-        card.innerHTML = `
-          <div class="drag-handle" aria-hidden="true">⠿</div>
-          <div class="event-dot"></div>
-          <div class="event-content">
-            <div class="event-name">${escapeHtml(evt.name)}</div>
-            <div class="event-desc">${escapeHtml(evt.description || '')}</div>
-          </div>
-          <div class="event-year${showResults ? ' revealed' : ''}">${evt.year}</div>
-        `
-
-        if (!submitted) {
-          card.addEventListener('dragstart', onDragStart)
-          card.addEventListener('dragover', onDragOver)
-          card.addEventListener('drop', onDrop)
-          card.addEventListener('dragend', onDragEnd)
-          // Keyboard accessibility
-          card.addEventListener('keydown', onKeyDown)
-        }
-
-        track.appendChild(card)
-      })
-    }
-
-    function escapeHtml(str) {
-      return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
-    }
-
-    // ─── Drag and Drop ────────────────────────────────────────────────────────
-    function onDragStart(e) {
-      dragSrcIdx = parseInt(e.currentTarget.dataset.idx)
-      e.currentTarget.classList.add('dragging')
-      e.dataTransfer.effectAllowed = 'move'
-    }
-
-    function onDragOver(e) {
-      e.preventDefault()
-      e.dataTransfer.dropEffect = 'move'
-      const target = e.currentTarget
-      if (parseInt(target.dataset.idx) !== dragSrcIdx) {
-        target.classList.add('drag-over')
-      }
-    }
-
-    function onDrop(e) {
-      e.preventDefault()
-      const targetIdx = parseInt(e.currentTarget.dataset.idx)
-      if (dragSrcIdx !== null && dragSrcIdx !== targetIdx) {
-        const moved = events.splice(dragSrcIdx, 1)[0]
-        events.splice(targetIdx, 0, moved)
-        renderTimeline()
-        sendStateUpdate('in_progress')
-      }
-      e.currentTarget.classList.remove('drag-over')
-    }
-
-    function onDragEnd(e) {
-      e.currentTarget.classList.remove('dragging')
-      document.querySelectorAll('.event-card').forEach(c => c.classList.remove('drag-over'))
-      dragSrcIdx = null
-    }
-
-    // Keyboard: arrow keys to move cards
-    function onKeyDown(e) {
-      const idx = parseInt(e.currentTarget.dataset.idx)
-      if (e.key === 'ArrowUp' && idx > 0) {
-        e.preventDefault()
-        const moved = events.splice(idx, 1)[0]
-        events.splice(idx - 1, 0, moved)
-        renderTimeline()
-        sendStateUpdate('in_progress')
-        // Refocus
-        setTimeout(() => {
-          const cards = document.querySelectorAll('.event-card')
-          if (cards[idx - 1]) cards[idx - 1].focus()
-        }, 50)
-      } else if (e.key === 'ArrowDown' && idx < events.length - 1) {
-        e.preventDefault()
-        const moved = events.splice(idx, 1)[0]
-        events.splice(idx + 1, 0, moved)
-        renderTimeline()
-        sendStateUpdate('in_progress')
-        setTimeout(() => {
-          const cards = document.querySelectorAll('.event-card')
-          if (cards[idx + 1]) cards[idx + 1].focus()
-        }, 50)
-      }
-    }
-
-    // ─── Submit ───────────────────────────────────────────────────────────────
-    document.getElementById('submit-btn').addEventListener('click', () => {
-      if (submitted) return
-      submitted = true
-      document.getElementById('submit-btn').disabled = true
-
-      const studentOrder = events.map(e => e.id)
-      const correctOrder = [...events].sort((a, b) => a.year - b.year).map(e => e.id)
-
-      let correct = 0
-      const perItemCorrectness = {}
-      studentOrder.forEach((id, i) => {
-        const isCorrect = id === correctOrder[i]
-        perItemCorrectness[id] = isCorrect
-        if (isCorrect) correct++
-      })
-      const score = Math.round((correct / events.length) * 100)
-
-      renderTimeline(true, perItemCorrectness)
-
-      const scoreEl = document.getElementById('score-display')
-      scoreEl.textContent = `${score}%`
-      scoreEl.style.display = 'block'
-
-      const finalState = {
-        type: 'timeline',
-        topic,
-        events: events.map(e => ({ ...e, placed: true })),
-        status: 'complete',
-        studentOrder,
-        correctOrder,
-        score,
-        perItemCorrectness
+          message: 'Timeline reset to a new shuffled order.',
+        }, false);
+        break;
       }
 
-      sendMessage('PLUGIN_COMPLETE', {
-        reason: 'Student submitted timeline arrangement',
-        finalState
-      })
-    })
+      default:
+        sendToolResult(toolCallId, { error: 'Unknown tool: ' + toolName }, true);
+    }
+  } catch (err) {
+    console.error('[Timeline] Tool error:', err);
+    sendToolResult(toolCallId, { error: String(err) }, true);
+  }
+}
 
-    // ─── Tool Handlers ────────────────────────────────────────────────────────
-    function handleToolInvoke(toolCallId, toolName, args) {
-      try {
-        if (toolName === 'load_timeline') {
-          topic = args.topic || 'Historical Events'
-          // Generate sample events for the topic
-          events = generateEventsForTopic(topic)
-          submitted = false
-          document.getElementById('topic-title').textContent = topic
-          document.getElementById('instructions').textContent = 'Drag events into chronological order, then submit'
-          document.getElementById('submit-btn').disabled = false
-          document.getElementById('score-display').style.display = 'none'
-          renderTimeline()
-          sendStateUpdate('in_progress')
-          sendMessage('TOOL_RESULT', {
-            toolCallId,
-            result: { success: true, topic, eventCount: events.length },
-            error: null
-          })
-        } else if (toolName === 'validate_arrangement') {
-          const studentOrder = events.map(e => e.id)
-          const correctOrder = [...events].sort((a, b) => a.year - b.year).map(e => e.id)
-          let correct = 0
-          const perItemCorrectness = {}
-          studentOrder.forEach((id, i) => {
-            const isCorrect = id === correctOrder[i]
-            perItemCorrectness[id] = isCorrect
-            if (isCorrect) correct++
-          })
-          const score = Math.round((correct / events.length) * 100)
-          sendMessage('TOOL_RESULT', {
-            toolCallId,
-            result: { studentOrder, correctOrder, score, perItemCorrectness },
-            error: null
-          })
-        } else {
-          throw new Error(`Unknown tool: ${toolName}`)
-        }
-      } catch (err) {
-        sendMessage('TOOL_RESULT', { toolCallId, result: null, error: err.message })
+// ─── Message listener (chatbridge-electron protocol v1.0) ─────────────────────
+window.addEventListener('message', function(event) {
+  const origin = event.origin;
+  if (registeredOrigin && registeredOrigin !== '*' && origin !== registeredOrigin && origin !== 'null') return;
+  const msg = event.data;
+  if (!msg || typeof msg !== 'object') return;
+  // Accept chatbridge-electron v1.0 and reference v1
+  if (msg.version !== '1.0' && msg.version !== 1) return;
+  if (msg.type === 'PLUGIN_INIT' || msg.type === 'INIT') {
+    registeredOrigin = (origin === 'null' || !origin) ? '*' : origin;
+    const initData = msg.payload || msg;
+    sessionId      = initData.sessionId || msg.sessionId;
+    pluginId       = initData.pluginId || msg.pluginId || 'timeline';
+    conversationId = initData.conversationId || msg.conversationId;
+    const restoredState = initData.restoredState || msg.restoredState;
+    if (restoredState && restoredState.topic) {
+      const rs = restoredState;
+      attemptCount = rs.attemptCount || 0;
+      loadTopic(rs.topic, rs.orderedEventIds || null);
+      if (rs.submitted && rs.validationStatus) {
+        submitted = true;
+        const result = validateArrangement();
+        lastValidationResult = result;
+        renderCards(true, result.perItemCorrectness);
+        updateHeaderBadges();
+        document.getElementById('submit-btn').disabled = true;
       }
     }
-
-    // ─── Event Data Generator ─────────────────────────────────────────────────
-    function generateEventsForTopic(topicName) {
-      const topicLower = topicName.toLowerCase()
-      const datasets = {
-        'american civil war': [
-          { id: 'e1', name: 'Fort Sumter Attack', year: 1861, description: 'Confederate forces attack Fort Sumter, starting the war' },
-          { id: 'e2', name: 'Battle of Antietam', year: 1862, description: 'Bloodiest single day in American military history' },
-          { id: 'e3', name: 'Emancipation Proclamation', year: 1863, description: 'Lincoln declares enslaved people in rebel states free' },
-          { id: 'e4', name: 'Battle of Gettysburg', year: 1863, description: 'Turning point of the war in the Union\'s favor' },
-          { id: 'e5', name: 'Sherman\'s March to the Sea', year: 1864, description: 'Union general devastates Confederate supply lines' },
-          { id: 'e6', name: 'Lee Surrenders at Appomattox', year: 1865, description: 'Confederate General Lee surrenders, ending the war' },
-        ],
-        'world war ii': [
-          { id: 'e1', name: 'Germany Invades Poland', year: 1939, description: 'Triggers declarations of war from Britain and France' },
-          { id: 'e2', name: 'Battle of Britain', year: 1940, description: 'RAF defends Britain against Luftwaffe air campaign' },
-          { id: 'e3', name: 'Pearl Harbor Attack', year: 1941, description: 'Japan attacks US naval base, bringing America into the war' },
-          { id: 'e4', name: 'Battle of Stalingrad', year: 1942, description: 'Turning point on the Eastern Front' },
-          { id: 'e5', name: 'D-Day Normandy Invasion', year: 1944, description: 'Allied forces land in France, beginning liberation of Europe' },
-          { id: 'e6', name: 'V-E Day', year: 1945, description: 'Germany surrenders, ending the war in Europe' },
-        ],
-        'american revolution': [
-          { id: 'e1', name: 'Boston Massacre', year: 1770, description: 'British soldiers kill five colonists, inflaming tensions' },
-          { id: 'e2', name: 'Boston Tea Party', year: 1773, description: 'Colonists dump British tea into Boston Harbor' },
-          { id: 'e3', name: 'Battles of Lexington and Concord', year: 1775, description: '"The shot heard round the world" — war begins' },
-          { id: 'e4', name: 'Declaration of Independence', year: 1776, description: 'Colonies formally declare independence from Britain' },
-          { id: 'e5', name: 'Valley Forge', year: 1777, description: 'Washington\'s army endures brutal winter encampment' },
-          { id: 'e6', name: 'Battle of Yorktown', year: 1781, description: 'Cornwallis surrenders, effectively ending the war' },
-        ],
-      }
-
-      // Find matching dataset
-      for (const [key, data] of Object.entries(datasets)) {
-        if (topicLower.includes(key) || key.includes(topicLower)) {
-          return shuffle([...data])
-        }
-      }
-
-      // Generic fallback
-      return shuffle([
-        { id: 'e1', name: `${topicName}: Event 1`, year: 1800, description: 'First major event' },
-        { id: 'e2', name: `${topicName}: Event 2`, year: 1820, description: 'Second major event' },
-        { id: 'e3', name: `${topicName}: Event 3`, year: 1840, description: 'Third major event' },
-        { id: 'e4', name: `${topicName}: Event 4`, year: 1860, description: 'Fourth major event' },
-        { id: 'e5', name: `${topicName}: Event 5`, year: 1880, description: 'Fifth major event' },
-      ])
-    }
-
-    function shuffle(arr) {
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]]
-      }
-      return arr
-    }
-
-    // ─── Message Listener ─────────────────────────────────────────────────────
-    window.addEventListener('message', (event) => {
-      const msg = event.data
-      if (!msg || msg.pluginId !== 'timeline') return
-      if (msg.type === 'PLUGIN_INIT') {
-        sessionId = msg.payload.sessionId
-      } else if (msg.type === 'TOOL_INVOKE') {
-        handleToolInvoke(msg.payload.toolCallId, msg.payload.toolName, msg.payload.arguments)
-      }
-    })
-
-    // Boot
-    sendMessage('PLUGIN_READY', { version: '1.0', capabilities: ['load_timeline', 'validate_arrangement'] })
-  </script>
+    // PLUGIN_READY was already sent on boot; just return after initialization.
+    return;
+  }
+  if (!registeredOrigin) return;
+  if (registeredOrigin !== '*' && origin !== registeredOrigin) return;
+  if (msg.pluginId && msg.pluginId !== pluginId) return;
+  if (msg.sessionId && msg.sessionId !== sessionId) return;
+  if (msg.type === 'TOOL_INVOKE') {
+    const invokeData = msg.payload || msg;
+    handleToolInvoke(invokeData);
+  } else if (msg.type === 'PING') {
+    sendMsg('PONG', {});
+  }
+});
+// Announce readiness to the PluginBridge immediately on boot.
+// The PluginBridge expects PLUGIN_READY first, then sends PLUGIN_INIT back.
+// We use '*' because we don't know the parent origin yet (srcdoc iframe).
+window.parent.postMessage({
+  type: 'PLUGIN_READY',
+  pluginId: pluginId,
+  sessionId: null,
+  payload: { version: '1.0', capabilities: ['load_timeline','validate_arrangement','get_timeline_state','get_hint'] },
+  timestamp: Date.now(),
+  version: '1.0'
+}, '*');
+</script>
 </body>
 </html>
