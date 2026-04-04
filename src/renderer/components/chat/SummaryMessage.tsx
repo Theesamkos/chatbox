@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import Markdown from '@/components/Markdown'
 import { cn } from '@/lib/utils'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useShallow } from 'zustand/react/shallow'
 import { ScalableIcon } from '../common/ScalableIcon'
 import { Modal } from '../layout/Overlay'
 
@@ -23,13 +24,26 @@ const SummaryMessage: FC<SummaryMessageProps> = ({ msg, className, isLatestSumma
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const { enableMarkdownRendering, enableLaTeXRendering, enableMermaidRendering } = useSettingsStore((state) => state)
+  const { enableMarkdownRendering, enableLaTeXRendering, enableMermaidRendering } = useSettingsStore(
+    useShallow((state) => ({
+      enableMarkdownRendering: state.enableMarkdownRendering,
+      enableLaTeXRendering: state.enableLaTeXRendering,
+      enableMermaidRendering: state.enableMermaidRendering,
+    }))
+  )
 
   const summaryText = getMessageText(msg)
 
   const handleConfirmDelete = () => {
     setShowDeleteConfirm(false)
     onDelete?.()
+  }
+
+  const handleBadgeKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      setExpanded(!expanded)
+    }
   }
 
   const handleEdit = useCallback(() => {
@@ -42,6 +56,11 @@ const SummaryMessage: FC<SummaryMessageProps> = ({ msg, className, isLatestSumma
       gap="xxs"
       className="cursor-pointer select-none px-3 py-1 rounded-full bg-chatbox-background-secondary hover:bg-chatbox-background-secondary-hover transition-colors"
       onClick={() => setExpanded(!expanded)}
+      onKeyDown={handleBadgeKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      aria-label={t('Earlier messages summarized') as string}
     >
       <ActionIcon variant="transparent" size="xs" c="chatbox-tertiary" p={0}>
         <ScalableIcon icon={expanded ? IconChevronUp : IconChevronDown} size={14} />
@@ -88,6 +107,7 @@ const SummaryMessage: FC<SummaryMessageProps> = ({ msg, className, isLatestSumma
                   p={4}
                   bd={0}
                   color="chatbox-secondary"
+                  aria-label={t('Edit')}
                   onClick={handleEdit}
                 >
                   <ScalableIcon icon={IconPencil} size={16} />
@@ -104,6 +124,7 @@ const SummaryMessage: FC<SummaryMessageProps> = ({ msg, className, isLatestSumma
                     p={4}
                     bd={0}
                     color="chatbox-secondary"
+                    aria-label={t('Delete')}
                     onClick={() => setShowDeleteConfirm(true)}
                   >
                     <ScalableIcon icon={IconTrash} size={16} />

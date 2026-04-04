@@ -1,5 +1,5 @@
 import NiceModal from '@ebay/nice-modal-react'
-import { Button } from '@mantine/core'
+import { Button, Skeleton, Stack } from '@mantine/core'
 import type { Message, ModelProvider } from '@shared/types'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
@@ -164,6 +164,18 @@ function RouteComponent() {
       modelId: currentSession.settings.modelId,
     }
   }, [currentSession?.settings?.provider, currentSession?.settings?.modelId])
+
+  if (isFetching && !currentSession) {
+    return (
+      <div className="flex flex-col h-full">
+        <Stack gap="md" p="md" pt="xl">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} h={80} radius="md" />
+          ))}
+        </Stack>
+      </div>
+    )
+  }
 
   return currentSession ? (
     <div className="flex flex-col h-full">

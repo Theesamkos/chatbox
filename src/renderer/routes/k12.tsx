@@ -64,6 +64,13 @@ const PLUGINS: PluginCard[] = [
 function K12Dashboard() {
   const navigate = useNavigate()
 
+  const handlePluginKeyDown = (e: React.KeyboardEvent, plugin: PluginCard) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      void handleLaunchPlugin(plugin)
+    }
+  }
+
   const handleLaunchPlugin = async (plugin: PluginCard) => {
     // Create a new chat session and navigate to it with the plugin pre-selected
     const settings = settingsStore.getState().getSettings()
@@ -125,6 +132,10 @@ function K12Dashboard() {
                     },
                   },
                 }}
+                tabIndex={0}
+                role="button"
+                aria-label={`${plugin.title}: ${plugin.description}`}
+                onKeyDown={(e) => handlePluginKeyDown(e, plugin)}
                 onClick={() => handleLaunchPlugin(plugin)}
               >
                 <Flex align="flex-start" gap="md">

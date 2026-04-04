@@ -17,8 +17,8 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import NiceModal from '@ebay/nice-modal-react'
-import { ActionIcon, Flex, Text, Tooltip } from '@mantine/core'
-import { IconArchive, IconSearch } from '@tabler/icons-react'
+import { ActionIcon, Flex, Stack, Text, Tooltip } from '@mantine/core'
+import { IconArchive, IconMessages, IconSearch } from '@tabler/icons-react'
 import { useRouterState } from '@tanstack/react-router'
 import type { MutableRefObject } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -82,6 +82,7 @@ export default function SessionList(props: Props) {
             variant="subtle"
             color="chatbox-tertiary"
             size={20}
+            aria-label={t('Search')}
             onClick={() => setOpenSearchDialog(true, true)}
           >
             <IconSearch />
@@ -93,6 +94,7 @@ export default function SessionList(props: Props) {
             variant="subtle"
             color="chatbox-tertiary"
             size={20}
+            aria-label={t('Clear Conversation List')}
             onClick={() => NiceModal.show('clear-session-list')}
           >
             <IconArchive />
@@ -108,23 +110,39 @@ export default function SessionList(props: Props) {
       >
         {sortedSessions && (
           <SortableContext items={sortedSessions} strategy={verticalListSortingStrategy}>
-            <Virtuoso
-              style={{ flex: 1 }}
-              data={sortedSessions}
-              scrollerRef={(ref) => {
-                if (ref instanceof HTMLDivElement) {
-                  props.sessionListViewportRef.current = ref
-                }
-              }}
-              itemContent={(_index, session) => (
-                <SortableItem id={session.id}>
-                  <SessionItem
-                    selected={routerState.location.pathname === `/session/${session.id}`}
-                    session={session}
-                  />
-                </SortableItem>
-              )}
-            />
+            {sortedSessions.length === 0 ? (
+              <Flex direction="column" align="center" justify="center" flex={1} gap="md" p="xl">
+                <Stack align="center" gap="xs">
+                  <div className="w-16 h-16 rounded-2xl bg-[var(--chatbox-background-secondary)] flex items-center justify-center">
+                    <IconMessages size={32} className="text-[var(--chatbox-tint-tertiary)]" />
+                  </div>
+                  <Text size="lg" fw={600} c="chatbox-primary">
+                    {t('No conversations yet')}
+                  </Text>
+                  <Text size="sm" c="chatbox-tertiary" ta="center" maw={280}>
+                    {t('Start a new chat to begin')}
+                  </Text>
+                </Stack>
+              </Flex>
+            ) : (
+              <Virtuoso
+                style={{ flex: 1 }}
+                data={sortedSessions}
+                scrollerRef={(ref) => {
+                  if (ref instanceof HTMLDivElement) {
+                    props.sessionListViewportRef.current = ref
+                  }
+                }}
+                itemContent={(_index, session) => (
+                  <SortableItem id={session.id}>
+                    <SessionItem
+                      selected={routerState.location.pathname === `/session/${session.id}`}
+                      session={session}
+                    />
+                  </SortableItem>
+                )}
+              />
+            )}
           </SortableContext>
         )}
       </DndContext>

@@ -38,6 +38,13 @@ function SessionItem(props: Props) {
 
   const [menuOpened, setMenuOpened] = useState(false)
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onClick()
+    }
+  }
+
   const actionMenuItems = useMemo<ActionMenuItemProps[]>(
     () => [
       {
@@ -102,9 +109,13 @@ function SessionItem(props: Props) {
       )}
       mx="xs"
       px="xs"
-      py={10}
-      gap={10}
+      py="sm"
+      gap="sm"
       onClick={onClick}
+      onKeyDown={handleKeyDown}
+      role="button"
+      tabIndex={0}
+      aria-label={session.name}
     >
       <AssistantAvatar
         avatarKey={session.assistantAvatarKey}
@@ -130,6 +141,7 @@ function SessionItem(props: Props) {
           variant="transparent"
           size={20}
           color={session.starred ? 'chatbox-brand' : 'chatbox-tertiary'}
+          aria-label={session.starred ? t('Starred session actions') : t('Session actions')}
           className={isSmallScreen || session.starred || menuOpened ? '' : 'group-hover/session-item:visible invisible'}
           onClick={(event) => {
             event.stopPropagation()

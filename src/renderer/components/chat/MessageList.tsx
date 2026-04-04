@@ -346,7 +346,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
   const renderMessageBlock = useCallback(
     (msg: SessionMessage, options: { isFirstItem: boolean; isLastItem: boolean }) => {
       return (
-        <Stack key={msg.id} gap={0} pt={msg.role === 'user' ? 4 : 0}>
+        <Stack key={msg.id} gap={0} pt={msg.role === 'user' ? 'xxs' : 0}>
           {currentThreadHash[msg.id] && (
             <ThreadLabel thread={currentThreadHash[msg.id]} sessionId={currentSession.id} />
           )}
@@ -481,7 +481,7 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
                         }}
                         size="xs"
                         h="auto"
-                        py={6}
+                        py="xs"
                         c="chatbox-tertiary"
                         onClick={item.onClick}
                         leftSection={<ScalableIcon icon={item.icon} size={16} />}

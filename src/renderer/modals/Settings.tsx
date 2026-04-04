@@ -91,6 +91,7 @@ export const SettingsModal: FC<SettingsModalProps> = (props) => {
             radius={18}
             onClick={onClose}
             autoFocus={false}
+            aria-label={t('Close settings')}
           >
             <ScalableIcon icon={IconX} size={20} />
           </Button>
