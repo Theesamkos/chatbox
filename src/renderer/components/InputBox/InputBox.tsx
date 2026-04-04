@@ -57,7 +57,6 @@ import { useIsSmallScreen } from '@/hooks/useScreenChange'
 import { cn } from '@/lib/utils'
 import {
   getContextMessageIds,
-  isAutoCompactionEnabled,
   isCompactionInProgress,
   useContextTokens,
 } from '@/packages/context-management'
@@ -341,7 +340,7 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
         constructedMessage: preConstructedMessage.message,
       })
 
-    const globalSettings = useSettingsStore((state) => state)
+    const globalAutoCompaction = useSettingsStore((state) => state.autoCompaction)
     const [isCompacting, setIsCompacting] = useState(false)
 
     const compactionUIStateMap = useAtomValue(compactionUIStateMapAtom)
@@ -351,9 +350,10 @@ const InputBox = forwardRef<InputBoxRef, InputBoxProps>(
     }, [compactionUIStateMap, currentSessionId, isNewSession])
 
     const autoCompactionEnabled = useMemo(() => {
-      if (!currentSession) return globalSettings.autoCompaction ?? true
-      return isAutoCompactionEnabled(currentSession.settings, globalSettings)
-    }, [currentSession, globalSettings])
+      if (!currentSession) return globalAutoCompaction ?? true
+      if (currentSession.settings?.autoCompaction !== undefined) return currentSession.settings.autoCompaction
+      return globalAutoCompaction ?? true
+    }, [currentSession, globalAutoCompaction])
 
     const contextWindowKnown = useMemo(() => {
       if (!model?.modelId) return false

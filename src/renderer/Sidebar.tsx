@@ -174,7 +174,7 @@ export default function Sidebar() {
           </Flex>
 
           <Tooltip label={t('Collapse')} openDelay={1000} withArrow>
-            <ActionIcon variant="subtle" color="chatbox-tertiary" size={20} onClick={() => setShowSidebar(false)}>
+            <ActionIcon variant="subtle" color="chatbox-tertiary" size={20} onClick={() => setShowSidebar(false)} aria-label={t('Collapse')}>
               <IconLayoutSidebarLeftCollapse />
             </ActionIcon>
           </Tooltip>
@@ -268,6 +268,7 @@ export default function Sidebar() {
                   variant="transparent"
                   color="chatbox-secondary"
                   size={24}
+                  aria-label={t('Help')}
                   onClick={() => {
                     navigate({ to: '/guide' })
                     setShowSidebar(false)
@@ -280,6 +281,7 @@ export default function Sidebar() {
                 variant="transparent"
                 color="chatbox-secondary"
                 size={24}
+                aria-label={t('Settings')}
                 onClick={() => {
                   navigateToSettings()
                   setShowSidebar(false)
@@ -366,10 +368,10 @@ export default function Sidebar() {
                 c="chatbox-tertiary"
                 className="rounded"
                 label={
-                  <Flex align="center" gap={6}>
+                  <Flex align="center" gap="xs">
                     <span>{`${t('About')} ${/\d/.test(versionHook.version) ? `(${versionHook.version})` : ''}`}</span>
                     {CHATBOX_BUILD_PLATFORM === 'android' && versionHook.needCheckUpdate && (
-                      <Box w={8} h={8} miw={8} bg="chatbox-brand" style={{ borderRadius: '50%' }} />
+                      <Box w="xs" h="xs" miw="xs" bg="chatbox-brand" style={{ borderRadius: '50%' }} />
                     )}
                   </Flex>
                 }

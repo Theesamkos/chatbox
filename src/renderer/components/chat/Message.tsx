@@ -40,6 +40,7 @@ import { countWord } from '@/packages/word-count'
 import platform from '@/platform'
 import { getSession } from '@/stores/chatStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useShallow } from 'zustand/react/shallow'
 import { useUIStore } from '@/stores/uiStore'
 import '../../static/Block.css'
 import { generateMore, modifyMessage, regenerateInNewFork, removeMessage } from '@/stores/sessionActions'
@@ -97,7 +98,24 @@ const _Message: FC<Props> = (props) => {
     autoCollapseCodeBlock,
     showAvatar,
     messageLayout,
-  } = useSettingsStore((state) => state)
+  } = useSettingsStore(
+    useShallow((state) => ({
+      userAvatarKey: state.userAvatarKey,
+      showMessageTimestamp: state.showMessageTimestamp,
+      showModelName: state.showModelName,
+      showTokenCount: state.showTokenCount,
+      showWordCount: state.showWordCount,
+      showTokenUsed: state.showTokenUsed,
+      showFirstTokenLatency: state.showFirstTokenLatency,
+      enableMarkdownRendering: state.enableMarkdownRendering,
+      enableLaTeXRendering: state.enableLaTeXRendering,
+      enableMermaidRendering: state.enableMermaidRendering,
+      autoPreviewArtifacts: state.autoPreviewArtifacts,
+      autoCollapseCodeBlock: state.autoCollapseCodeBlock,
+      showAvatar: state.showAvatar,
+      messageLayout: state.messageLayout,
+    }))
+  )
 
   const isBubbleLayout = messageLayout === 'bubble'
 
