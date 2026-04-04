@@ -31,6 +31,12 @@ import {
   safetyLayer,
 } from '../packages/plugin-bridge'
 import { PluginBridge } from '../packages/plugin-bridge/PluginBridge'
+import {
+  clearActivePluginState,
+  registerPluginToolInvoker,
+  setActivePluginState,
+  unregisterPluginToolInvoker,
+} from '../stores/pluginStateStore'
 
 // ─── Hook State ───────────────────────────────────────────────────────────────
 
@@ -81,12 +87,15 @@ export function useK12Plugin(
         return // State rejected — logged by safety layer
       }
       setPluginState(state)
+      // Sync to module-level store so generation.ts can inject it into the system prompt
+      setActivePluginState(sessionId, state)
     },
     onComplete: (id: PluginId, payload: PluginCompletePayload) => {
       setLifecycleState('complete')
       setLastCompletionPayload(payload)
       if (payload.finalState) {
         setPluginState(payload.finalState)
+        setActivePluginState(sessionId, payload.finalState)
       }
     },
     onError: (id: PluginId, payload: PluginErrorPayload) => {
@@ -142,8 +151,16 @@ export function useK12Plugin(
       setPluginState(null)
       setErrorMessage(null)
       setLastCompletionPayload(null)
+      // Clear stale plugin state from the module-level store
+      clearActivePluginState(sessionId)
 
       bridgeRef.current = new PluginBridge(registration.manifest, sessionId, userRole, callbacks)
+
+      // Register the tool invoker so generation.ts can route AI tool calls to this bridge
+      const bridge = bridgeRef.current
+      registerPluginToolInvoker(sessionId, (toolCallId, toolName, args) =>
+        bridge.invokeToolOnPlugin(toolCallId, toolName, args)
+      )
 
       // If iframe is already attached, attach the bridge to it
       if (iframeRef.current) {
@@ -163,7 +180,10 @@ export function useK12Plugin(
     setPluginState(null)
     setErrorMessage(null)
     setLastCompletionPayload(null)
-  }, [])
+    // Clear plugin state and tool invoker from module-level store
+    clearActivePluginState(sessionId)
+    unregisterPluginToolInvoker(sessionId)
+  }, [sessionId])
 
   const attachIframe = useCallback((iframe: HTMLIFrameElement) => {
     iframeRef.current = iframe
@@ -197,8 +217,10 @@ export function useK12Plugin(
         bridgeRef.current.detach()
         bridgeRef.current = null
       }
+      // Clear plugin state from module-level store on unmount
+      clearActivePluginState(sessionId)
     }
-  }, [])
+  }, [sessionId])
 
   // ─── Derived State ───────────────────────────────────────────────────────────
 

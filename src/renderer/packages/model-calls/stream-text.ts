@@ -35,6 +35,7 @@ import {
 } from './tools'
 import fileToolSet from './toolsets/file'
 import { getToolSet } from './toolsets/knowledge-base'
+import { buildPluginToolSet } from './toolsets/plugin'
 import websearchToolSet, { parseLinkTool, webSearchTool } from './toolsets/web-search'
 
 /**
@@ -313,6 +314,17 @@ export async function streamText(
       tools = {
         ...tools,
         ...fileToolSet.tools,
+      }
+    }
+
+    // Add K-12 plugin tools if a plugin is active for this session
+    if (sessionId) {
+      const pluginTools = buildPluginToolSet(sessionId)
+      if (Object.keys(pluginTools).length > 0) {
+        tools = {
+          ...tools,
+          ...pluginTools,
+        }
       }
     }
 

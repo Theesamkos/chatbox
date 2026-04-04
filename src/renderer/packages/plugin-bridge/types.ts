@@ -113,6 +113,8 @@ export interface ChessState {
   status: 'active' | 'checkmate' | 'stalemate' | 'draw' | 'resigned'
   lastMove: string | null
   capturedPieces: { white: string[]; black: string[] }
+  /** True when the state update was triggered by a human player move — signals AI to respond */
+  humanMove?: boolean
 }
 
 export interface TimelineEvent {

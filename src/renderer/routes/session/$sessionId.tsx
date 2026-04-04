@@ -72,7 +72,28 @@ function RouteComponent() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSessionId])
-  // ─────────────────────────────────────────────────────────────────────────
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // ─── Chess Auto-Play: trigger AI response when human makes a move ───────────
+  const prevChessStateRef = useRef<typeof k12PluginState.pluginState>(null)
+  useEffect(() => {
+    const state = k12PluginState.pluginState
+    const prevState = prevChessStateRef.current
+    prevChessStateRef.current = state
+
+    if (
+      state?.type === 'chess' &&
+      (state as { type: string; humanMove?: boolean; status?: string; lastMove?: string | null }).humanMove === true &&
+      (state as { type: string; status?: string }).status === 'active' &&
+      state !== prevState
+    ) {
+      const chessState = state as { type: string; lastMove?: string | null }
+      const msg = constructUserMessage(
+        `I just moved ${chessState.lastMove ?? 'a piece'}. It's your turn (Black). Please make your move using the chess tool.`
+      )
+      void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
+    }
+  }, [k12PluginState.pluginState, currentSessionId])
 
   useEffect(() => {
     setTimeout(() => {
