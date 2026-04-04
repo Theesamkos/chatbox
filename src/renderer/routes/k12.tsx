@@ -13,7 +13,11 @@
 import { Badge, Box, Button, Card, Flex, Grid, Stack, Text, Title } from '@mantine/core'
 import { IconBrain, IconChessBishop, IconClock, IconSearch, IconSparkles } from '@tabler/icons-react'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import type { PluginId } from '@/packages/plugin-bridge'
 import { createEmpty } from '@/stores/sessionActions'
+
+/** localStorage key used to pass plugin launch intent from K12 dashboard → session route */
+export const K12_PENDING_PLUGIN_KEY = 'chatbridge_k12_pending_plugin'
 
 // @ts-ignore — route will be registered in routeTree after pnpm dev regenerates
 export const Route = createFileRoute('/k12' as never)({
@@ -21,7 +25,7 @@ export const Route = createFileRoute('/k12' as never)({
 })
 
 interface PluginCard {
-  id: 'chess' | 'timeline' | 'artifact_studio'
+  id: PluginId
   title: string
   description: string
   icon: React.ReactNode
@@ -67,6 +71,11 @@ function K12Dashboard() {
     // Create a new chat session and navigate to it with the plugin pre-selected
     const session = await createEmpty('chat')
     const sessionId = session.id
+    // Store plugin intent so the session route can launch the plugin on mount
+    localStorage.setItem(
+      K12_PENDING_PLUGIN_KEY,
+      JSON.stringify({ pluginId: plugin.id, quickStart: plugin.quickStart, sessionId })
+    )
     navigate({
       to: '/session/$sessionId',
       params: { sessionId },
