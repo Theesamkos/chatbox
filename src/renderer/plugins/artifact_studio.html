@@ -1686,18 +1686,16 @@
 
   // ── API calls ──────────────────────────────────────────────────────────────
   async function apiSearchArtifacts(query, dateRange, culturalContext, page) {
-    const input = { query, page: page || 0 };
-    if (dateRange) input.dateRange = dateRange;
-    if (culturalContext) input.culturalContext = culturalContext;
-    const url = '/api/trpc/artifacts.search?batch=1&input=' + encodeURIComponent(JSON.stringify({ '0': { json: input } }));
+    const params = new URLSearchParams({ q: query, page: String(page || 0) });
+    if (culturalContext) params.set('culturalContext', culturalContext);
+    const url = '/api/artifacts-search?' + params.toString();
     const data = await proxyFetch(url);
-    const result = data?.[0]?.result?.data?.json;
-    return result ?? { artifacts: [], totalCount: 0, source: 'unavailable' };
+    return data ?? { artifacts: [], totalCount: 0, source: 'unavailable' };
   }
   async function apiGetArtifactDetail(id, source) {
-    const url = '/api/trpc/artifacts.getDetail?batch=1&input=' + encodeURIComponent(JSON.stringify({ '0': { json: { id, source } } }));
+    const url = '/api/artifacts-detail?id=' + encodeURIComponent(id);
     const data = await proxyFetch(url);
-    return data?.[0]?.result?.data?.json ?? null;
+    return data ?? null;
   }
 
   async function triggerScoring() {
