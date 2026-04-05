@@ -111,7 +111,10 @@ const MessageList = forwardRef<MessageListRef, MessageListProps>((props, ref) =>
     () => currentSession && getCurrentThreadHistoryHash(currentSession),
     [currentSession]
   )
-  const currentMessageList = useMemo(() => getAllMessageList(currentSession), [currentSession])
+  const currentMessageList = useMemo(
+    () => getAllMessageList(currentSession).filter((m) => m.role !== 'system'),
+    [currentSession]
+  )
 
   const latestSummaryMessageId = useMemo(() => {
     for (let i = currentMessageList.length - 1; i >= 0; i--) {
