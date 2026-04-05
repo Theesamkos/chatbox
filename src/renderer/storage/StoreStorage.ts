@@ -50,12 +50,27 @@ export default class StoreStorage extends BaseStorage {
 
   private debounceQueue = new Map<string, DebouncedFunc<(key: string, value: unknown) => void>>()
 
+  // Keys that must be written immediately — losing them on tab close is unacceptable.
+  private immediateKeys = new Set<string>(['settings', 'onboarding-completed'])
+
   public async setItem<T>(key: string, value: T): Promise<void> {
+    // Critical keys (API keys, onboarding state) skip the debounce so they
+    // are never lost when the user closes the tab before the timer fires.
+    if (this.immediateKeys.has(key)) {
+      return this.setItemNow(key, value)
+    }
     let debounced = this.debounceQueue.get(key)
     if (!debounced) {
       debounced = debounce(this.setItemNow.bind(this), 500, { maxWait: 2000 })
       this.debounceQueue.set(key, debounced)
     }
     debounced(key, value)
+  }
+
+  /** Flush all pending debounced writes — call from beforeunload to avoid data loss. */
+  public flushAll() {
+    for (const debounced of this.debounceQueue.values()) {
+      debounced.flush()
+    }
   }
 }
