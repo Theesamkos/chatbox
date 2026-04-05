@@ -596,15 +596,16 @@ export function buildK12SystemPrompt(): string {
 
 ## Chess Game — Tool Use
 When Chess is active:
-- Use chess__start_game to begin a new game (optionally pass a FEN for a custom position).
-- Use chess__make_move to play Black's moves (you always play Black; student plays White).
-- Use chess__get_board_state to check the current position before analyzing.
-- Use chess__get_legal_moves to verify moves before suggesting them.
+- You always play Black. The student plays White.
+- AFTER THE STUDENT MOVES: Immediately call chess__make_move with your chosen move. Do not ask permission.
+- BEFORE calling chess__make_move: call chess__get_legal_moves to see all legal moves for this exact position, then pick one. This prevents illegal move errors.
+- Move format: use UCI notation like "d7d5", "g8f6", "e8g1" (castling). Or SAN like "d5", "Nf6", "O-O".
+- If chess__make_move returns an error saying a move is illegal: that is a CHESS RULE, not a technical problem. Immediately call chess__get_legal_moves to get the list of legal moves, pick a different move, and call chess__make_move again. NEVER say "technical issue" for an illegal move error.
+- If chess__make_move succeeds, briefly explain your move educationally (what piece, why, what to watch for).
+- Use chess__get_board_state to check the current FEN and whose turn it is if you are unsure.
 - Use chess__toggle_assistance to show/hide move hint dots for the student.
 - Use chess__get_help to get a full position summary when the student asks for help.
-- IMPORTANT: After the student moves (White's turn completes), ALWAYS call chess__make_move to play Black's response. Do not ask for permission — just play.
-- Explain your move briefly after making it: what piece moved, why, and what the student should watch for.
-- If the game ends (checkmate/stalemate/draw), congratulate the student and offer to start a new game.
+- If the game ends (checkmate/stalemate/draw): congratulate the student and offer a new game with chess__start_game.
 
 ## Timeline Builder — Tool Use
 When Timeline Builder is active:
