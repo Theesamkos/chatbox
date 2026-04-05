@@ -17,6 +17,9 @@ import type { PluginStateSnapshot } from '@/packages/plugin-bridge/types'
 // sessionId → latest plugin state snapshot
 const _stateStore = new Map<string, PluginStateSnapshot>()
 
+// sessionId → active plugin ID (set when a plugin is launched)
+const _activePluginIdStore = new Map<string, string>()
+
 // sessionId → tool invoker function (provided by useK12Plugin)
 type ToolInvoker = (toolCallId: string, toolName: string, args: Record<string, unknown>) => Promise<unknown>
 const _toolInvokerStore = new Map<string, ToolInvoker>()
@@ -41,6 +44,24 @@ export function getActivePluginState(sessionId: string): PluginStateSnapshot | n
 export function clearActivePluginState(sessionId: string): void {
   _stateStore.delete(sessionId)
   _toolInvokerStore.delete(sessionId)
+  _activePluginIdStore.delete(sessionId)
+}
+
+// ─── Active Plugin ID API ─────────────────────────────────────────────────────
+
+/** Set the active plugin ID for a session (called by useK12Plugin on launch) */
+export function setActivePluginId(sessionId: string, pluginId: string): void {
+  _activePluginIdStore.set(sessionId, pluginId)
+}
+
+/** Get the active plugin ID for a session */
+export function getActivePluginId(sessionId: string): string | null {
+  return _activePluginIdStore.get(sessionId) ?? null
+}
+
+/** Clear the active plugin ID for a session */
+export function clearActivePluginId(sessionId: string): void {
+  _activePluginIdStore.delete(sessionId)
 }
 
 // ─── Tool Invoker API ─────────────────────────────────────────────────────────

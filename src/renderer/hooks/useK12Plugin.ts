@@ -32,8 +32,10 @@ import {
 } from '../packages/plugin-bridge'
 import { PluginBridge } from '../packages/plugin-bridge/PluginBridge'
 import {
+  clearActivePluginId,
   clearActivePluginState,
   registerPluginToolInvoker,
+  setActivePluginId,
   setActivePluginState,
   unregisterPluginToolInvoker,
 } from '../stores/pluginStateStore'
@@ -153,6 +155,8 @@ export function useK12Plugin(
       setLastCompletionPayload(null)
       // Clear stale plugin state from the module-level store
       clearActivePluginState(sessionId)
+      // Register which plugin is active for this session
+      setActivePluginId(sessionId, id)
 
       bridgeRef.current = new PluginBridge(registration.manifest, sessionId, userRole, callbacks)
 
@@ -180,9 +184,10 @@ export function useK12Plugin(
     setPluginState(null)
     setErrorMessage(null)
     setLastCompletionPayload(null)
-    // Clear plugin state and tool invoker from module-level store
+    // Clear plugin state, tool invoker, and active plugin ID from module-level store
     clearActivePluginState(sessionId)
     unregisterPluginToolInvoker(sessionId)
+    clearActivePluginId(sessionId)
   }, [sessionId])
 
   const attachIframe = useCallback((iframe: HTMLIFrameElement) => {

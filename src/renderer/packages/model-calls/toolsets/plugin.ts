@@ -12,7 +12,7 @@
 import { tool } from 'ai'
 import { z } from 'zod'
 import { pluginRegistry } from '@/packages/plugin-bridge'
-import { hasActivePlugin, invokePluginTool } from '@/stores/pluginStateStore'
+import { getActivePluginId, hasActivePlugin, invokePluginTool } from '@/stores/pluginStateStore'
 import { uniqueId } from 'lodash'
 
 /**
@@ -28,7 +28,15 @@ export function buildPluginToolSet(sessionId: string): Record<string, any> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tools: Record<string, any> = {}
 
-  for (const registration of pluginRegistry.getActivePlugins()) {
+  // Only expose tools for the plugin that is active in THIS session.
+  // pluginRegistry.getActivePlugins() returns ALL enabled plugins; we must filter
+  // to the session's plugin so the AI doesn't see irrelevant tool names.
+  const activePluginId = getActivePluginId(sessionId)
+  const registrations = activePluginId
+    ? pluginRegistry.getActivePlugins().filter((r) => r.manifest.id === activePluginId)
+    : pluginRegistry.getActivePlugins()
+
+  for (const registration of registrations) {
     for (const toolDef of registration.manifest.tools) {
       const namespacedName = `${registration.manifest.id}__${toolDef.name}`
       const inputSchema = buildZodSchema(toolDef.parameters)
