@@ -13,20 +13,24 @@
  * - Resizable split pane
  */
 
-import { AlertCircle, ChevronRight, Loader2, X, ZapOff } from 'lucide-react'
-import { useCallback, useEffect, useRef } from 'react'
+import { AlertCircle, ChevronDown, ChevronRight, Loader2, X, ZapOff } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { K12PluginActions, K12PluginState } from '../../hooks/useK12Plugin'
 import type { PluginId } from '../../packages/plugin-bridge'
 
-// ─── Plugin HTML Sources (built-in plugins) ───────────────────────────────────
-// These are imported at build time and embedded as srcdoc to avoid external requests
-// The iframe origin will be "null" which is handled in PluginBridge origin validation
+// ─── Plugin display names & game list ────────────────────────────────────────
 
 const PLUGIN_DISPLAY_NAMES: Record<PluginId, string> = {
   chess: 'Chess',
   timeline: 'Timeline Builder',
   artifact_studio: 'Artifact Investigation Studio',
 }
+
+const GAME_LIST: { id: PluginId; label: string }[] = [
+  { id: 'chess', label: 'Chess' },
+  { id: 'timeline', label: 'Timeline Builder' },
+  { id: 'artifact_studio', label: 'Artifact Studio' },
+]
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -35,11 +39,12 @@ interface PluginContainerProps {
   actions: K12PluginActions
   pluginHtmlContent: string | null
   onClose?: () => void
+  onGameSwitch?: (pluginId: PluginId) => void
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function PluginContainer({ state, actions, pluginHtmlContent, onClose }: PluginContainerProps) {
+export function PluginContainer({ state, actions, pluginHtmlContent, onClose, onGameSwitch }: PluginContainerProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   // Attach/detach the iframe to the PluginBridge
@@ -121,7 +126,11 @@ export function PluginContainer({ state, actions, pluginHtmlContent, onClose }: 
       <div className="plugin-header flex items-center justify-between px-4 py-3 border-b border-white/10 bg-[#141414]">
         <div className="flex items-center gap-2">
           <PluginStatusIndicator state={state} />
-          <span className="text-sm font-semibold text-white/90 tracking-tight">{displayName}</span>
+          <GameSwitcherDropdown
+            activePluginId={state.pluginId}
+            displayName={displayName}
+            onSwitch={onGameSwitch}
+          />
         </div>
         <div className="flex items-center gap-2">
           {state.lifecycleState === 'complete' && (
@@ -188,6 +197,90 @@ export function PluginContainer({ state, actions, pluginHtmlContent, onClose }: 
               Activity complete — see the chat for feedback
             </span>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Game Switcher Dropdown ───────────────────────────────────────────────────
+
+function GameSwitcherDropdown({
+  activePluginId,
+  displayName,
+  onSwitch,
+}: {
+  activePluginId: PluginId | null
+  displayName: string
+  onSwitch?: (id: PluginId) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  if (!onSwitch) {
+    return <span className="text-sm font-semibold text-white/90 tracking-tight">{displayName}</span>
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1 text-sm font-semibold text-white/90 hover:text-white transition-colors"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{displayName}</span>
+        <ChevronDown
+          size={12}
+          className={`text-white/50 transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {open && (
+        <div
+          className="absolute top-full left-0 mt-1.5 w-52 bg-[#1c1c1c] border border-white/10 rounded-lg shadow-2xl z-50 overflow-hidden"
+          role="listbox"
+        >
+          <div className="px-3 py-1.5 text-xs text-white/35 font-medium uppercase tracking-wider border-b border-white/5">
+            Switch Activity
+          </div>
+          {GAME_LIST.map((game) => {
+            const isActive = game.id === activePluginId
+            return (
+              <button
+                key={game.id}
+                role="option"
+                aria-selected={isActive}
+                disabled={isActive}
+                onClick={() => {
+                  onSwitch(game.id)
+                  setOpen(false)
+                }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors ${
+                  isActive
+                    ? 'text-blue-400 bg-blue-500/10 cursor-default'
+                    : 'text-white/70 hover:bg-white/5 hover:text-white cursor-pointer'
+                }`}
+              >
+                <span className="flex-1">{game.label}</span>
+                {isActive && (
+                  <span className="text-xs text-blue-400 bg-blue-500/15 px-1.5 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
       )}
     </div>

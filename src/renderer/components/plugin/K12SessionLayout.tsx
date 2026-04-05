@@ -9,6 +9,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 import type { K12PluginActions, K12PluginState } from '../../hooks/useK12Plugin'
+import type { PluginId } from '../../packages/plugin-bridge'
 import { PluginContainer } from './PluginContainer'
 
 interface K12SessionLayoutProps {
@@ -17,6 +18,7 @@ interface K12SessionLayoutProps {
   pluginActions: K12PluginActions
   pluginHtmlContent: string | null
   onPluginClose?: () => void
+  onGameSwitch?: (pluginId: PluginId) => void
 }
 
 const MIN_CHAT_WIDTH = 320  // px
@@ -28,6 +30,7 @@ export function K12SessionLayout({
   pluginActions,
   pluginHtmlContent,
   onPluginClose,
+  onGameSwitch,
 }: K12SessionLayoutProps) {
   const [chatWidthPercent, setChatWidthPercent] = useState(42)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -109,6 +112,7 @@ export function K12SessionLayout({
           actions={pluginActions}
           pluginHtmlContent={pluginHtmlContent}
           onClose={onPluginClose}
+          onGameSwitch={onGameSwitch}
         />
       </div>
     </div>

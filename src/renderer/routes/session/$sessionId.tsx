@@ -26,6 +26,12 @@ export const Route = createFileRoute('/session/$sessionId')({
   component: RouteComponent,
 })
 
+const GAME_INFO: Record<PluginId, { name: string }> = {
+  chess: { name: 'Chess' },
+  timeline: { name: 'Timeline Builder' },
+  artifact_studio: { name: 'Artifact Investigation Studio' },
+}
+
 function RouteComponent() {
   const { t } = useTranslation()
   const { sessionId: currentSessionId } = Route.useParams()
@@ -49,6 +55,25 @@ function RouteComponent() {
   // ─── K-12 Plugin Split-View ───────────────────────────────────────────────
   const [k12PluginState, k12PluginActions] = useK12Plugin(currentSessionId)
   const [k12PluginHtml, setK12PluginHtml] = useState<string | null>(null)
+
+  const handleGameSwitch = useCallback(
+    (newPluginId: PluginId) => {
+      if (newPluginId === k12PluginState.pluginId) return
+      const oldName = k12PluginState.pluginId ? (GAME_INFO[k12PluginState.pluginId]?.name ?? k12PluginState.pluginId) : 'the previous activity'
+      const newName = GAME_INFO[newPluginId]?.name ?? newPluginId
+
+      const html = getPluginHtml(newPluginId)
+      setK12PluginHtml(html)
+      k12PluginActions.launchPlugin(newPluginId)
+
+      const switchMsg = constructUserMessage(
+        `I've switched from ${oldName} to ${newName}. Please acknowledge the switch and guide me on what to do next in ${newName}.`
+      )
+      void submitNewUserMessage(currentSessionId, { newUserMsg: switchMsg, needGenerating: true })
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [k12PluginState.pluginId, k12PluginActions, currentSessionId]
+  )
 
   // On mount: check if we were launched from the K-12 dashboard with a pending plugin
   useEffect(() => {
@@ -261,6 +286,7 @@ function RouteComponent() {
       pluginActions={k12PluginActions}
       pluginHtmlContent={k12PluginHtml}
       onPluginClose={() => setK12PluginHtml(null)}
+      onGameSwitch={handleGameSwitch}
     >
       {chatPanel}
     </K12SessionLayout>
