@@ -121,8 +121,13 @@ export const settingsStore = createStore<Settings & Action>()(
  * Keys are only seeded when the stored value is empty — user-entered keys are never overwritten.
  */
 function seedSettingsFromEnv(): void {
-  const openaiKey = (import.meta.env.VITE_OPENAI_API_KEY as string | undefined) ?? ''
-  const anthropicKey = (import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined) ?? ''
+  // Support both naming conventions (VITE_DEFAULT_*_KEY matches what's set in Vercel)
+  const openaiKey =
+    ((import.meta.env.VITE_DEFAULT_OPENAI_KEY as string | undefined) ?? '') ||
+    ((import.meta.env.VITE_OPENAI_API_KEY as string | undefined) ?? '')
+  const anthropicKey =
+    ((import.meta.env.VITE_DEFAULT_ANTHROPIC_KEY as string | undefined) ?? '') ||
+    ((import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined) ?? '')
   const defaultProvider = (import.meta.env.VITE_DEFAULT_PROVIDER as string | undefined) ?? ''
   const defaultModel = (import.meta.env.VITE_DEFAULT_MODEL as string | undefined) ?? ''
 
