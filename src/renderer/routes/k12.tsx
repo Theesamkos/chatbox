@@ -15,8 +15,10 @@ import { IconBrain, IconChessBishop, IconClock, IconSearch, IconSparkles } from 
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import type { PluginId } from '@/packages/plugin-bridge'
 import { buildK12SystemPrompt, createEmpty } from '@/stores/sessionActions'
-import { updateSessionWithMessages } from '@/stores/chatStore'
+import { updateSessionWithMessages, updateSession } from '@/stores/chatStore'
 import { createMessage } from '@shared/types'
+import { settingsStore } from '@/stores/settingsStore'
+import { ModelProviderEnum } from '@shared/types/provider'
 
 /** localStorage key used to pass plugin launch intent from K12 dashboard → session route */
 export const K12_PENDING_PLUGIN_KEY = 'chatbridge_k12_pending_plugin'
@@ -80,6 +82,34 @@ function K12Dashboard() {
     // Create a new chat session and navigate to it with the plugin pre-selected
     const session = await createEmpty('chat')
     const sessionId = session.id
+
+    // Override the model: K12 sessions must use a real AI provider (not ChatboxAI).
+    // Pick the first provider that has an API key configured, preferring OpenAI then Claude.
+    const settings = settingsStore.getState().getSettings()
+    const providers = settings.providers ?? {}
+    const preferredProviders = [
+      ModelProviderEnum.OpenAI,
+      ModelProviderEnum.Claude,
+      ModelProviderEnum.OpenAIResponses,
+    ] as string[]
+    const firstConfigured = preferredProviders.find((p) => {
+      const key = providers[p]?.apiKey
+      return key && key.trim().length > 0
+    })
+    if (firstConfigured && session.settings?.provider !== firstConfigured) {
+      // Find a sensible default model for the provider
+      const providerModels = providers[firstConfigured]?.models
+      const defaultModelId =
+        providerModels?.[0]?.id ??
+        (firstConfigured === ModelProviderEnum.OpenAI ? 'gpt-4o' :
+         firstConfigured === ModelProviderEnum.Claude ? 'claude-3-5-sonnet-20241022' : undefined)
+      if (defaultModelId) {
+        await updateSession(sessionId, (s) => ({
+          ...s,
+          settings: { ...s.settings, provider: firstConfigured, modelId: defaultModelId },
+        }))
+      }
+    }
 
     // Immediately set the K12 TutorMeAI system prompt so the AI has full context
     // from the very first message, regardless of whether the plugin state has loaded yet.
