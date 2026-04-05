@@ -108,17 +108,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error("[artifacts-detail] Error:", err);
-    return res.status(200).json({
+    return res.status(502).json({
+      error: "Met Museum API temporarily unavailable. Please try again.",
       id,
-      title: "Unavailable",
-      date: "Unknown",
-      medium: null,
-      dimensions: null,
-      provenance: null,
-      description: null,
-      imageUrl: null,
-      source: "met",
-      metadata: {},
     });
   }
 }

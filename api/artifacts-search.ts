@@ -135,12 +135,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error("[artifacts-search] Error:", err);
-    return res.status(200).json({
+    // Return 502 so the plugin can distinguish API failure from empty results
+    return res.status(502).json({
       artifacts: [],
       totalCount: 0,
       source: "unavailable",
       page,
-      error: "Met Museum API temporarily unavailable",
+      error: "Met Museum API temporarily unavailable. Please try again.",
     });
   }
 }

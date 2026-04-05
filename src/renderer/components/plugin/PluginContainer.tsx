@@ -60,7 +60,32 @@ export function PluginContainer({ state, actions, pluginHtmlContent, onClose, on
   // API_PROXY_REQUEST handler — plugins run without allow-same-origin so they
   // cannot fetch() directly. They post API_PROXY_REQUEST; we fetch from the
   // parent frame (which has full network access) and reply with API_PROXY_RESPONSE.
+  //
+  // Security: only allowed domains may be proxied — plugins cannot reach arbitrary URLs.
   useEffect(() => {
+    const ALLOWED_PROXY_DOMAINS = [
+      'collectionapi.metmuseum.org',
+      'api.si.edu',
+      'www.loc.gov',
+      'en.wikipedia.org',
+      'api.wikimedia.org',
+    ]
+
+    const isAllowedUrl = (rawUrl: string): boolean => {
+      try {
+        // Relative paths (e.g., /api/...) are always same-origin — allowed
+        if (rawUrl.startsWith('/')) return true
+        const parsed = new URL(rawUrl)
+        // Same-origin absolute URLs are allowed
+        if (parsed.hostname === window.location.hostname) return true
+        // External URLs require HTTPS and must be in the allowlist
+        if (parsed.protocol !== 'https:') return false
+        return ALLOWED_PROXY_DOMAINS.some((d) => parsed.hostname === d || parsed.hostname.endsWith(`.${d}`))
+      } catch {
+        return false
+      }
+    }
+
     const handleProxyRequest = async (event: MessageEvent) => {
       if (!event.data || event.data.type !== 'API_PROXY_REQUEST') return
       const msg = event.data as {
@@ -76,6 +101,22 @@ export function PluginContainer({ state, actions, pluginHtmlContent, onClose, on
       const { requestId, url, method = 'GET', body, headers } = msg
       const iframe = iframeRef.current
       if (!iframe?.contentWindow) return
+
+      // Reject disallowed URLs
+      if (!isAllowedUrl(url)) {
+        console.warn(`[PluginContainer] API_PROXY_REQUEST blocked for disallowed URL: ${url}`)
+        iframe.contentWindow.postMessage({
+          type: 'API_PROXY_RESPONSE',
+          requestId,
+          sessionId: msg.sessionId,
+          pluginId: msg.pluginId,
+          ok: false,
+          status: 403,
+          data: { error: 'URL not in proxy allowlist' },
+        }, '*')
+        return
+      }
+
       try {
         const fetchOptions: RequestInit = {
           method,

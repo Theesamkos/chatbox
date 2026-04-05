@@ -102,6 +102,7 @@ function RouteComponent() {
 
   // ─── Chess Auto-Play: trigger AI response when human makes a move ───────────
   const prevChessStateRef = useRef<typeof k12PluginState.pluginState>(null)
+  const chessAutoPlayPendingRef = useRef(false)
   useEffect(() => {
     const state = k12PluginState.pluginState
     const prevState = prevChessStateRef.current
@@ -111,22 +112,28 @@ function RouteComponent() {
       state?.type === 'chess' &&
       (state as { type: string; humanMove?: boolean; status?: string }).humanMove === true &&
       (state as { type: string; status?: string }).status === 'active' &&
-      state !== prevState
+      state !== prevState &&
+      !lastGeneratingMessage &&        // Don't queue if AI is already responding
+      !chessAutoPlayPendingRef.current // Don't double-trigger on rapid state updates
     ) {
-      // lastMove is an object {from, to, san} from chess.html — format it as a readable string
-      const chessState = state as { type: string; lastMove?: { from?: string; to?: string; san?: string } | string | null }
-      const lm = chessState.lastMove
-      const lastMoveStr = !lm
-        ? 'a piece'
-        : typeof lm === 'string'
-          ? lm
-          : lm.san ?? (lm.from && lm.to ? `${lm.from}${lm.to}` : 'a piece')
-      const msg = constructUserMessage(
-        `I just moved ${lastMoveStr}. It's your turn (Black). Please make your move using the chess tool.`
-      )
-      void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
+      chessAutoPlayPendingRef.current = true
+      // Small delay lets the board animation settle before AI responds
+      setTimeout(() => {
+        chessAutoPlayPendingRef.current = false
+        const chessState = state as { type: string; lastMove?: { from?: string; to?: string; san?: string } | string | null }
+        const lm = chessState.lastMove
+        const lastMoveStr = !lm
+          ? 'a piece'
+          : typeof lm === 'string'
+            ? lm
+            : lm.san ?? (lm.from && lm.to ? `${lm.from}${lm.to}` : 'a piece')
+        const msg = constructUserMessage(
+          `I just moved ${lastMoveStr}. It's your turn (Black). Please make your move using the chess__make_move tool.`
+        )
+        void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
+      }, 300)
     }
-  }, [k12PluginState.pluginState, currentSessionId])
+  }, [k12PluginState.pluginState, currentSessionId, lastGeneratingMessage])
 
   useEffect(() => {
     setTimeout(() => {

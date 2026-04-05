@@ -4,6 +4,9 @@
  * Stores plugin manifests in electron-store (local persistence).
  * No plugin can load in an iframe unless its origin is in the allowlist.
  * Changes to the allowlist take effect on the next session start.
+ *
+ * Tool schemas here MUST match the actual implementations in the plugin HTML files.
+ * Run `grep -n "case '" src/renderer/plugins/*.html` to verify tool names.
  */
 
 import type { PluginId, PluginManifest, PluginRegistration, PluginRegistry as PluginRegistryType } from './types'
@@ -15,7 +18,7 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
     id: 'chess',
     name: 'Chess',
     version: '1.0.0',
-    description: 'Interactive chess board with AI analysis. Play against the AI or analyze positions.',
+    description: 'Interactive chess board with AI coaching. Play against the AI or analyze positions.',
     origin: 'null', // srcdoc iframe has null origin — handled specially
     iframeUrl: 'builtin://chess',
     allowedRoles: ['student', 'teacher', 'admin'],
@@ -33,38 +36,68 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
     tools: [
       {
         name: 'start_game',
-        description: 'Initialize a new chess game and return the starting position',
+        description: 'Initialize a new chess game. Optionally start from a custom FEN position.',
         parameters: {
           type: 'object',
           required: [],
           properties: {
-            playerColor: {
+            fen: {
               type: 'string',
-              description: 'Color for the student to play (white or black)',
-              enum: ['white', 'black'],
+              description: 'Optional FEN string to start from a custom position. Omit to start a new game from the standard opening position.',
             },
           },
         },
       },
       {
         name: 'make_move',
-        description: 'Make a chess move in UCI notation (e.g., e2e4). Returns new FEN and move result.',
+        description: 'Make a chess move. Accepts UCI notation (e2e4) or SAN notation (e4, Nf3, O-O). Returns new FEN, move result, and game status.',
         parameters: {
           type: 'object',
           required: ['move'],
           properties: {
-            move: { type: 'string', description: 'Move in UCI notation (e.g., e2e4, g1f3)' },
+            move: {
+              type: 'string',
+              description: 'Move in UCI notation (e.g., e2e4, g1f3, e1g1 for castling) or SAN notation (e4, Nf3, O-O)',
+            },
           },
         },
       },
       {
         name: 'get_board_state',
-        description: 'Get the current board state as a FEN string and whose turn it is',
+        description: 'Get the current board state: FEN string, whose turn it is, move history, captured pieces, and game status.',
         parameters: { type: 'object', required: [], properties: {} },
       },
       {
         name: 'get_legal_moves',
-        description: 'Get all legal moves for the current position',
+        description: 'Get all legal moves for the current position, or legal moves for a specific square.',
+        parameters: {
+          type: 'object',
+          required: [],
+          properties: {
+            square: {
+              type: 'string',
+              description: 'Optional square in algebraic notation (e.g., e2). If omitted, returns all legal moves.',
+            },
+          },
+        },
+      },
+      {
+        name: 'toggle_assistance',
+        description: 'Toggle move assistance mode (shows legal move dots on the board). Use to help or challenge the student.',
+        parameters: {
+          type: 'object',
+          required: [],
+          properties: {
+            enabled: {
+              type: 'boolean',
+              description: 'True to enable assistance (show legal move hints), false to disable. Omit to toggle current state.',
+            },
+          },
+        },
+      },
+      {
+        name: 'get_help',
+        description: 'Get comprehensive help information: legal moves, captures, move history, captured pieces, and current position analysis.',
         parameters: { type: 'object', required: [], properties: {} },
       },
     ],
@@ -73,7 +106,7 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
     id: 'timeline',
     name: 'Timeline Builder',
     version: '1.0.0',
-    description: 'Arrange historical events in chronological order. Tests historical reasoning skills.',
+    description: 'Arrange historical events in chronological order. Tests historical reasoning with deterministic validation.',
     origin: 'null',
     iframeUrl: 'builtin://timeline',
     allowedRoles: ['student', 'teacher', 'admin'],
@@ -90,28 +123,41 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
     tools: [
       {
         name: 'load_timeline',
-        description: 'Load a set of shuffled historical events for a given topic for the student to arrange',
+        description: 'Load a shuffled set of historical events for a given topic. The student will drag them into chronological order. Supported topics: "World War II", "American Civil War", "Ancient Rome", "Space Race", "French Revolution", "Industrial Revolution", "Civil Rights Movement", "Renaissance".',
         parameters: {
           type: 'object',
           required: ['topic'],
           properties: {
-            topic: { type: 'string', description: 'Historical topic (e.g., American Civil War, World War II)' },
+            topic: {
+              type: 'string',
+              description: 'Historical topic to load. Use exact topic names like "World War II", "American Civil War", "Ancient Rome", "Space Race", "French Revolution", "Industrial Revolution", "Civil Rights Movement", "Renaissance".',
+            },
           },
         },
       },
       {
         name: 'validate_arrangement',
-        description: 'Validate the student\'s event arrangement and return correctness per item and overall score',
+        description: 'Validate the student\'s current event arrangement and return per-item correctness and an overall score. This signals TIMELINE_COMPLETE and ends the activity.',
         parameters: {
           type: 'object',
-          required: ['orderedEventIds'],
+          required: [],
           properties: {
             orderedEventIds: {
               type: 'string',
-              description: 'Comma-separated event IDs in the student\'s order',
+              description: 'Optional: comma-separated event IDs in the student\'s intended order. If omitted, uses the current drag-and-drop arrangement in the UI.',
             },
           },
         },
+      },
+      {
+        name: 'get_state',
+        description: 'Get the current timeline state: topic, loaded events, student\'s current arrangement, attempt count, and available topics.',
+        parameters: { type: 'object', required: [], properties: {} },
+      },
+      {
+        name: 'reset_timeline',
+        description: 'Reset the current timeline to a new shuffled order so the student can try again.',
+        parameters: { type: 'object', required: [], properties: {} },
       },
     ],
   },
@@ -120,7 +166,7 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
     name: 'Artifact Investigation Studio',
     version: '1.0.0',
     description:
-      'Guided artifact-based historical inquiry using Smithsonian and Library of Congress collections. Students discover, inspect, and investigate artifacts to build evidence-based claims.',
+      'Guided artifact-based historical inquiry using Met Museum collections. Students discover, inspect, and investigate artifacts to build evidence-based claims.',
     origin: 'null',
     iframeUrl: 'builtin://artifact_studio',
     allowedRoles: ['student', 'teacher', 'admin'],
@@ -137,40 +183,46 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
     tools: [
       {
         name: 'search_artifacts',
-        description: 'Search for historical artifacts by topic or keyword using Smithsonian API (with Library of Congress fallback)',
+        description: 'Search for historical artifacts by topic or keyword using the Met Museum API. Returns a list of artifacts with titles, dates, and thumbnails.',
         parameters: {
           type: 'object',
           required: ['query'],
           properties: {
-            query: { type: 'string', description: 'Search query for artifacts' },
-            dateRange: { type: 'string', description: 'Optional date range filter (e.g., 1860-1865)' },
-            culturalContext: { type: 'string', description: 'Optional cultural context filter' },
+            query: { type: 'string', description: 'Search query for artifacts (e.g., "ancient Egypt", "medieval armor", "Roman coins")' },
+            dateRange: { type: 'string', description: 'Optional date range filter (e.g., "1860-1865", "500BC-200BC")' },
+            culturalContext: { type: 'string', description: 'Optional cultural context filter (e.g., "Egyptian", "Greek", "American")' },
           },
         },
       },
       {
         name: 'get_artifact_detail',
-        description: 'Get full metadata and high-resolution image URL for a specific artifact',
+        description: 'Get full metadata and image URL for a specific artifact so the student can inspect it closely.',
         parameters: {
           type: 'object',
-          required: ['artifactId'],
+          required: ['id'],
           properties: {
-            artifactId: { type: 'string', description: 'Artifact ID from search results' },
+            id: { type: 'string', description: 'Artifact ID from search results (the id field in search response)' },
           },
         },
       },
       {
         name: 'submit_investigation',
-        description: 'Submit the student\'s completed investigation with observations, evidence, and claims',
+        description: 'Submit the student\'s completed investigation. All four investigation fields (observations, evidence, interpretation, hypothesis) must have at least 50 characters each before calling this. This triggers PLUGIN_COMPLETE.',
         parameters: {
           type: 'object',
-          required: ['observations', 'evidence', 'claims'],
-          properties: {
-            observations: { type: 'string', description: 'What the student directly sees in the artifact' },
-            evidence: { type: 'string', description: 'What the observations suggest about the artifact\'s context' },
-            claims: { type: 'string', description: 'The student\'s interpretive conclusion' },
-          },
+          required: [],
+          properties: {},
         },
+      },
+      {
+        name: 'get_investigation_state',
+        description: 'Get the current investigation state: selected artifact, all four investigation field contents, phase, and completion status.',
+        parameters: { type: 'object', required: [], properties: {} },
+      },
+      {
+        name: 'reset_investigation',
+        description: 'Reset the investigation fields so the student can start over. If an artifact is selected, returns to the investigate phase; otherwise returns to discover.',
+        parameters: { type: 'object', required: [], properties: {} },
       },
     ],
   },
@@ -183,21 +235,26 @@ export class PluginRegistry {
   private registry: PluginRegistryType
 
   constructor() {
-    this.registry = this.loadRegistry()
+    this.registry = this.buildDefaultRegistry()
+    // Attempt to merge any persisted overrides (e.g., disabled plugins)
+    this.mergePersistedOverrides()
   }
 
-  private loadRegistry(): PluginRegistryType {
-    // Try to load from electron-store via the preload bridge
-    // Fall back to built-in plugins if not available
+  private mergePersistedOverrides(): void {
     try {
       const stored = window.localStorage.getItem(PLUGIN_REGISTRY_KEY)
-      if (stored) {
-        return JSON.parse(stored) as PluginRegistryType
+      if (!stored) return
+      const parsed = JSON.parse(stored) as PluginRegistryType
+      // Only merge status overrides — never use stored tool schemas (could be stale)
+      for (const pluginId of Object.keys(parsed.plugins) as PluginId[]) {
+        if (this.registry.plugins[pluginId] && parsed.plugins[pluginId].status === 'disabled') {
+          this.registry.plugins[pluginId].status = 'disabled'
+          this.registry.plugins[pluginId].updatedAt = parsed.plugins[pluginId].updatedAt
+        }
       }
     } catch {
-      // localStorage not available (Electron with no allow-same-origin on main window)
+      // localStorage not available or parse error — use defaults
     }
-    return this.buildDefaultRegistry()
   }
 
   private buildDefaultRegistry(): PluginRegistryType {
