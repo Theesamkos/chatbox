@@ -109,6 +109,77 @@ export const settingsStore = createStore<Settings & Action>()(
   )
 )
 
+/**
+ * Seed API keys from Vite/Vercel environment variables if the settings have no key yet.
+ *
+ * Platform operators set these in Vercel → Project → Environment Variables:
+ *   VITE_OPENAI_API_KEY      → auto-configures the OpenAI provider
+ *   VITE_ANTHROPIC_API_KEY   → auto-configures the Claude provider
+ *   VITE_DEFAULT_PROVIDER    → "openai" or "claude" (which provider to default to)
+ *   VITE_DEFAULT_MODEL       → model ID override (e.g. "gpt-4o", "claude-sonnet-4-5")
+ *
+ * Keys are only seeded when the stored value is empty — user-entered keys are never overwritten.
+ */
+function seedSettingsFromEnv(): void {
+  const openaiKey = (import.meta.env.VITE_OPENAI_API_KEY as string | undefined) ?? ''
+  const anthropicKey = (import.meta.env.VITE_ANTHROPIC_API_KEY as string | undefined) ?? ''
+  const defaultProvider = (import.meta.env.VITE_DEFAULT_PROVIDER as string | undefined) ?? ''
+  const defaultModel = (import.meta.env.VITE_DEFAULT_MODEL as string | undefined) ?? ''
+
+  if (!openaiKey && !anthropicKey) return // nothing to seed
+
+  settingsStore.setState((s) => {
+    const providers = { ...(s.providers ?? {}) }
+    let dirty = false
+
+    if (openaiKey && !providers['openai']?.apiKey) {
+      providers['openai'] = { ...(providers['openai'] ?? {}), apiKey: openaiKey }
+      dirty = true
+    }
+
+    if (anthropicKey && !providers['claude']?.apiKey) {
+      providers['claude'] = { ...(providers['claude'] ?? {}), apiKey: anthropicKey }
+      dirty = true
+    }
+
+    if (!dirty) return s
+
+    log.info('[ENV_SEED] Seeded provider API key(s) from environment variables')
+    return { ...s, providers }
+  })
+
+  // Set the default provider/model if specified and no session-level override exists
+  if (defaultProvider) {
+    settingsStore.setState((s) => {
+      // Only write if this provider actually has a key now
+      const hasKey = !!s.providers?.[defaultProvider]?.apiKey
+      if (!hasKey) return s
+      // We store last-used provider in a separate store; here we just ensure the
+      // provider entry exists. The K12 launcher picks the first configured provider.
+      return s
+    })
+  }
+
+  if (defaultModel && defaultProvider) {
+    settingsStore.setState((s) => {
+      const existing = s.providers?.[defaultProvider]
+      if (!existing?.apiKey) return s
+      // Inject the default model into the provider's model list if not already there
+      const models = existing.models ?? []
+      const alreadyListed = models.some((m) => m.modelId === defaultModel)
+      if (alreadyListed) return s
+      const providers = {
+        ...(s.providers ?? {}),
+        [defaultProvider]: {
+          ...existing,
+          models: [{ modelId: defaultModel }, ...models],
+        },
+      }
+      return { ...s, providers }
+    })
+  }
+}
+
 let _initSettingsStorePromise: Promise<Settings> | undefined
 export const initSettingsStore = async () => {
   if (!_initSettingsStorePromise) {
@@ -121,7 +192,9 @@ export const initSettingsStore = async () => {
           log.info(`[CONFIG_DEBUG] onFinishHydration: providersCount=0`)
         }
         unsub()
-        resolve(val)
+        // Seed from env vars after hydration so we don't overwrite persisted user keys
+        seedSettingsFromEnv()
+        resolve(settingsStore.getState().getSettings())
       })
       settingsStore.persist.rehydrate()
     })

@@ -100,9 +100,9 @@ function K12Dashboard() {
       // Find a sensible default model for the provider
       const providerModels = providers[firstConfigured]?.models
       const defaultModelId =
-        providerModels?.[0]?.id ??
+        providerModels?.[0]?.modelId ??
         (firstConfigured === ModelProviderEnum.OpenAI ? 'gpt-4o' :
-         firstConfigured === ModelProviderEnum.Claude ? 'claude-3-5-sonnet-20241022' : undefined)
+         firstConfigured === ModelProviderEnum.Claude ? 'claude-sonnet-4-5' : undefined)
       if (defaultModelId) {
         await updateSession(sessionId, (s) => ({
           ...s,
