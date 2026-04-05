@@ -598,7 +598,7 @@ export function buildK12SystemPrompt(): string {
 /** Format the active plugin state as a concise context block for the system prompt */
 function buildPluginStateText(state: { type: string; [key: string]: unknown }): string {
   if (state.type === 'chess') {
-    const s = state as { type: string; fen?: string; turn?: string; status?: string; moveHistory?: string[]; lastMove?: string | null }
+    const s = state as { type: string; fen?: string; turn?: string; status?: string; moveHistory?: string[]; lastMove?: { from?: string; to?: string; san?: string } | string | null }
     const lines = [
       '## Active Tool: Chess Game',
       `- FEN: ${s.fen ?? 'starting position'}`,
@@ -606,7 +606,12 @@ function buildPluginStateText(state: { type: string; [key: string]: unknown }): 
       `- Status: ${s.status ?? 'active'}`,
       `- Move history: ${s.moveHistory && s.moveHistory.length > 0 ? s.moveHistory.join(', ') : 'No moves yet'}`,
     ]
-    if (s.lastMove) lines.push(`- Last move: ${s.lastMove}`)
+    if (s.lastMove) {
+      // lastMove can be an object {from, to, san} or a string — format it properly
+      const lm = s.lastMove
+      const lmStr = typeof lm === 'string' ? lm : (lm.san ?? (lm.from && lm.to ? `${lm.from}${lm.to}` : JSON.stringify(lm)))
+      lines.push(`- Last move: ${lmStr}`)
+    }
     lines.push('')
     lines.push('When the student asks you to make a move or when it is Black\'s turn, use the chess__make_move tool.')
     lines.push('When the student asks to start a new game, use the chess__start_game tool.')

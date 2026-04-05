@@ -84,13 +84,20 @@ function RouteComponent() {
 
     if (
       state?.type === 'chess' &&
-      (state as { type: string; humanMove?: boolean; status?: string; lastMove?: string | null }).humanMove === true &&
+      (state as { type: string; humanMove?: boolean; status?: string }).humanMove === true &&
       (state as { type: string; status?: string }).status === 'active' &&
       state !== prevState
     ) {
-      const chessState = state as { type: string; lastMove?: string | null }
+      // lastMove is an object {from, to, san} from chess.html — format it as a readable string
+      const chessState = state as { type: string; lastMove?: { from?: string; to?: string; san?: string } | string | null }
+      const lm = chessState.lastMove
+      const lastMoveStr = !lm
+        ? 'a piece'
+        : typeof lm === 'string'
+          ? lm
+          : lm.san ?? (lm.from && lm.to ? `${lm.from}${lm.to}` : 'a piece')
       const msg = constructUserMessage(
-        `I just moved ${chessState.lastMove ?? 'a piece'}. It's your turn (Black). Please make your move using the chess tool.`
+        `I just moved ${lastMoveStr}. It's your turn (Black). Please make your move using the chess tool.`
       )
       void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
     }
