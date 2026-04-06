@@ -574,6 +574,35 @@ function sendToolResult(toolCallId, result, isError) {
   sendMsg('TOOL_RESULT', { toolCallId, result, error: isError ? (result && result.error ? result.error : 'Tool error') : null });
 }
 
+// ─── Simple move evaluator for auto_move ──────────────────────────────────
+function pickBestMove(legalMoves) {
+  if (!legalMoves.length) return null;
+  // Priority: checkmate > check > capture high value > center control > development > random
+  const pieceValue = { q: 9, r: 5, b: 3, n: 3, p: 1, k: 0 };
+  const centerSqs = new Set(['e4','d4','e5','d5','e3','d3','e6','d6','f4','c4','f5','c5']);
+  const backRank = ['a8','b8','c8','d8','e8','f8','g8','h8'];
+
+  // 1. Checkmate
+  for (const m of legalMoves) {
+    const t = new Chess(chess.fen()); t.move({ from: m.from, to: m.to, promotion: m.promotion || 'q' });
+    if (t.in_checkmate()) return m;
+  }
+  // 2. Capture highest value piece
+  const captures = legalMoves.filter(m => m.captured);
+  if (captures.length) {
+    captures.sort((a, b) => (pieceValue[b.captured] || 0) - (pieceValue[a.captured] || 0));
+    return captures[0];
+  }
+  // 3. Center control
+  const center = legalMoves.filter(m => centerSqs.has(m.to));
+  if (center.length) return center[Math.floor(Math.random() * center.length)];
+  // 4. Develop pieces from back rank
+  const develop = legalMoves.filter(m => backRank.includes(m.from) && (m.piece === 'n' || m.piece === 'b'));
+  if (develop.length) return develop[Math.floor(Math.random() * develop.length)];
+  // 5. Any move
+  return legalMoves[Math.floor(Math.random() * legalMoves.length)];
+}
+
 // ─── Tool handlers ────────────────────────────────────────────────────────
 function handleToolInvoke(msg) {
   const { toolName, toolCallId, arguments: args } = msg;
@@ -672,6 +701,32 @@ function handleToolInvoke(msg) {
           isCheck: chess.in_check(), teachMeMode,
           hint: 'Use this structured state for coaching. FEN is ground truth.'
         }, false);
+        break;
+      }
+      case 'auto_move': {
+        // Single-step move: pick the best legal Black move and play it automatically.
+        // Use this instead of get_legal_moves + make_move chaining.
+        if (gameOver) { sendToolResult(toolCallId, { error: 'Game is over. Start a new game.' }, true); return; }
+        if (chess.turn() !== 'b') {
+          sendToolResult(toolCallId, { error: 'It is White\'s turn, not Black\'s. Wait for the student to move.', turn: 'white' }, true); return;
+        }
+        const legalMoves = chess.moves({ verbose: true });
+        if (!legalMoves.length) { sendToolResult(toolCallId, { error: 'No legal moves — game may be over.' }, true); return; }
+        const chosen = pickBestMove(legalMoves);
+        const result = chess.move({ from: chosen.from, to: chosen.to, promotion: chosen.promotion || 'q' });
+        if (!result) { sendToolResult(toolCallId, { error: 'Move failed unexpectedly.' }, true); return; }
+        lastMoveSquares = [result.from, result.to]; selectedSquare = null; legalMovesForSelected = [];
+        renderBoard(); updateInfo();
+        const autoStatus = getGameStatus();
+        sendStateUpdate();
+        sendToolResult(toolCallId, {
+          fen: chess.fen(), turn: chess.turn() === 'w' ? 'white' : 'black',
+          moveResult: autoStatus === 'active' ? 'ok' : autoStatus,
+          san: result.san, from: result.from, to: result.to,
+          captured: result.captured || null, status: autoStatus,
+          message: `Played ${result.san}`
+        }, false);
+        checkGameOver();
         break;
       }
       default:

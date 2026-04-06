@@ -82,6 +82,11 @@ const BUILT_IN_PLUGINS: PluginManifest[] = [
         },
       },
       {
+        name: 'auto_move',
+        description: 'Make the best available Black move automatically. Use this INSTEAD of get_legal_moves + make_move. One call does everything: picks the best legal Black move and plays it. Returns the move played and new board state.',
+        parameters: { type: 'object', required: [], properties: {} },
+      },
+      {
         name: 'toggle_assistance',
         description: 'Toggle move assistance mode (shows legal move dots on the board). Use to help or challenge the student.',
         parameters: {
