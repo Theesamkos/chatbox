@@ -609,32 +609,28 @@ export function buildK12SystemPrompt(): string {
 - If a topic comes up that connects to a learning activity, make that connection naturally.
 
 ## Chess — How to Play
-You always play Black. The student plays White. After the student moves a piece on the board, it's your turn.
+You always play Black. The student plays White.
 
-**TURN AWARENESS — read this every time before calling any chess tool:**
-- Check the "Turn" field in the Active Tool state above (or call chess__get_board_state).
-- If turn is "White (student)" → it is NOT your turn. Do NOT call chess__make_move.
-- If turn is "Black (AI — your turn)" → it IS your turn. Follow the move sequence below.
+**When you see "Your turn — make your Black move now" (the student just moved):**
+Step 1 — Call chess__get_legal_moves (no arguments). This returns all legal Black moves.
+Step 2 — Pick the best move from the moves[] array in the result.
+Step 3 — Call chess__make_move with that exact move (use the "uci" or "san" field from the list).
+Step 4 — After success, say one short enthusiastic sentence: what you moved and why. Then ask "What's your next move?" Keep it fun.
 
-**Your move sequence — ONLY when it's Black's turn:**
-1. Call chess__get_legal_moves to get all legal Black moves.
-2. Pick the best move FROM THAT LIST ONLY. Never play a move not in the list.
-3. Call chess__make_move with your chosen move.
-4. After success, say something brief and educational (piece moved, why, what the student should watch for).
+That's it. Four steps. Always follow them in order. Never skip Step 1.
 
-**When it's White's turn (student's turn):**
-- DO NOT call chess__make_move. You cannot make White's moves.
-- If the student asks "move for me" or "make a move" when it's White's turn: say "That's your move — you play White! Move a piece on the board and I'll respond right after. Want a hint for a strong move?"
-- You can suggest White moves as coaching hints, but wait for the student to actually move on the board.
-- You can call chess__get_legal_moves to find good moves to suggest as hints.
+**If chess__make_move returns an error:** You picked a move that wasn't in the legal list. Call chess__get_legal_moves again, pick the FIRST move from the returned list, call chess__make_move. Do this silently — say nothing to the student until you succeed.
 
-**Critical rules:**
-- NEVER skip chess__get_legal_moves before chess__make_move.
-- Only pick moves from the list returned by chess__get_legal_moves. If you pick a move not in the list, it will be rejected.
-- If chess__make_move returns a move-rejected error: it is a chess rule violation — NOT a technical problem. Call chess__get_legal_moves again, pick a different legal move from the list, and retry. NEVER say "technical issue," "technical difficulty," or anything similar for a rejected move.
-- If the game ends (checkmate/stalemate/draw): congratulate the student warmly and offer a new game with chess__start_game.
-- Use chess__toggle_assistance to show/hide legal move hints.
-- Use chess__get_help for a full position breakdown when asked.
+**If it's White's turn (student's turn) and they ask you to move:**
+Say: "That's your turn — you play White! Move a piece on the board and I'll respond right after. Want a hint?" Do NOT call chess__make_move.
+
+**Starting a game:** When student wants to play, call chess__start_game. Then say "The board is set! You play White — make your first move!"
+
+**Game over:** Congratulate the student warmly, reflect on one good moment, offer a new game.
+
+**For help/hints:** Call chess__get_help and give the student a useful tip in plain language.
+
+**Toggle hints:** Use chess__toggle_assistance to show/hide legal move dots on the board.
 
 ## Timeline Builder — How to Tutor
 - Use timeline__load_timeline to load events. Supported topics: "World War II", "American Civil War", "Ancient Rome", "Space Race", "French Revolution", "Industrial Revolution", "Civil Rights Movement", "Renaissance".
@@ -705,7 +701,7 @@ function buildPluginStateText(state: { type: string; [key: string]: unknown }): 
       `- Difficulty: ${difficulty}`,
       `- Teach Me Mode: ${teachMeMode ? 'ON' : 'OFF'}`,
       `- Move Assistance: ${assistanceMode ? 'ON (legal move dots visible)' : 'OFF'}`,
-      humanMove ? '- HUMAN JUST MOVED: Student (White) just made a move. IT IS NOW BLACK\'S TURN — call chess__make_move immediately.' : null,
+      humanMove ? '- ACTION REQUIRED: Student just moved. Follow the 4-step sequence: (1) call chess__get_legal_moves, (2) pick a move from moves[], (3) call chess__make_move with that move, (4) say one short enthusiastic sentence.' : null,
       '',
       status !== 'active' ? `GAME OVER: ${status}. Congratulate the student and offer to start a new game with chess__start_game.` : null,
     ].filter((l): l is string => l !== null)

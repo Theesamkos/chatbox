@@ -128,7 +128,7 @@ function RouteComponent() {
             ? lm
             : lm.san ?? (lm.from && lm.to ? `${lm.from}${lm.to}` : 'a piece')
         const msg = constructUserMessage(
-          `I just moved ${lastMoveStr}. It's your turn (Black). Please make your move using the chess__make_move tool.`
+          `I just moved ${lastMoveStr}. Your turn — make your Black move now.`
         )
         void submitNewUserMessage(currentSessionId, { newUserMsg: msg, needGenerating: true })
       }, 300)

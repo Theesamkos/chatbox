@@ -606,19 +606,21 @@ function handleToolInvoke(msg) {
           result = chess.move(moveArg);
         }
         if (!result) {
-          // Try to diagnose why the move failed for a better error message
           const currentTurn = chess.turn() === 'w' ? 'white' : 'black';
-          let errorMsg = `"${moveArg}" is not a legal move in this position. Call get_legal_moves to see all valid moves.`;
-          // Detect wrong-turn: check if the source square has a piece of the wrong color
+          const legalMoves = chess.moves({ verbose: true });
+          let errorMsg = `ILLEGAL MOVE: "${moveArg}" is not legal. REQUIRED NEXT ACTION: call chess__get_legal_moves immediately, pick the first move from the returned moves[] array, call chess__make_move with it. Say nothing to the student until you succeed.`;
           if (uciMatch) {
             const fromSq = uciMatch[1].toLowerCase();
             const piece = chess.get(fromSq);
             if (piece && ((chess.turn() === 'w' && piece.color === 'b') || (chess.turn() === 'b' && piece.color === 'w'))) {
-              errorMsg = `WRONG TURN: It is ${currentTurn}'s turn, not ${currentTurn === 'white' ? 'black' : 'white'}'s. You tried to move a ${piece.color === 'w' ? 'White' : 'Black'} piece (${fromSq}) but it is ${currentTurn}'s turn. DO NOT call make_move — it is the student's turn. Wait for them to move on the board.`;
+              errorMsg = `WRONG TURN: It is ${currentTurn}'s turn. You cannot move the other side's pieces. DO NOT call make_move again — wait for the student to move on the board.`;
             }
           }
-          sendToolResult(toolCallId, { moveResult:'illegal', error: errorMsg,
-            fen:chess.fen(), turn: currentTurn, legalMovesCount:chess.moves().length }, true); return;
+          sendToolResult(toolCallId, {
+            moveResult: 'illegal', error: errorMsg,
+            fen: chess.fen(), turn: currentTurn,
+            hint: legalMoves.length > 0 ? `Try: ${legalMoves[0].san} (${legalMoves[0].from}${legalMoves[0].to})` : 'No legal moves available'
+          }, true); return;
         }
         lastMoveSquares = [result.from, result.to]; selectedSquare = null; legalMovesForSelected = [];
         renderBoard(); updateInfo();
