@@ -1150,13 +1150,16 @@ function sendStateUpdate() {
 
 function buildState() {
   return {
+    type: 'timeline',
     topic: currentTopic,
+    events: currentEvents.map(e => ({ id: e.id, title: e.title, year: e.year })),
     orderedEventIds: currentEvents.map(e => e.id),
     submitted,
     attemptCount,
     validationStatus: lastValidationResult ? lastValidationResult.status : null,
     score: lastValidationResult ? lastValidationResult.score : null,
     total: lastValidationResult ? lastValidationResult.total : null,
+    status: submitted && lastValidationResult ? 'complete' : 'in_progress',
     completionStatus: submitted && lastValidationResult ? 'TIMELINE_COMPLETE' : 'in_progress',
   };
 }
@@ -1346,7 +1349,7 @@ window.parent.postMessage({
   type: 'PLUGIN_READY',
   pluginId: pluginId,
   sessionId: null,
-  payload: { version: '1.0', capabilities: ['load_timeline','validate_arrangement','get_timeline_state','get_hint'] },
+  payload: { version: '1.0', capabilities: ['load_timeline','validate_arrangement','get_state','reset_timeline'] },
   timestamp: Date.now(),
   version: '1.0'
 }, '*');

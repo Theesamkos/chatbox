@@ -1383,7 +1383,7 @@
     window.parent.postMessage(msg, '*');
   }
   function sendReady() {
-    sendMessage('PLUGIN_READY', { version: '1.0', capabilities: ['search_artifacts','get_artifact_detail','submit_investigation','get_investigation_state','reset_investigation','get_state'] });
+    sendMessage('PLUGIN_READY', { version: '1.0', capabilities: ['search_artifacts','get_artifact_detail','submit_investigation','get_investigation_state','reset_investigation'] });
   }
   function sendStateUpdate() {
     sendMessage('STATE_UPDATE', { state: buildSerializableState() });
@@ -1417,6 +1417,7 @@
   }
   function buildSerializableState() {
     return {
+      type: 'artifact_investigation',
       phase: state.phase,
       searchQuery: state.searchQuery,
       selectedArtifact: state.selectedArtifact ? {
@@ -2266,7 +2267,7 @@
         type: 'PLUGIN_READY',
         pluginId: pluginId,
         sessionId: null,
-        payload: { version: '1.0', capabilities: ['search_artifacts','get_artifact_detail','submit_investigation','get_investigation_state','reset_investigation','get_state'] },
+        payload: { version: '1.0', capabilities: ['search_artifacts','get_artifact_detail','submit_investigation','get_investigation_state','reset_investigation'] },
         timestamp: Date.now(),
         version: '1.0'
       }, '*');
