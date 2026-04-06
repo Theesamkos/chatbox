@@ -606,21 +606,32 @@ export function buildK12SystemPrompt(): string {
 - If a topic comes up that connects to a learning activity, make that connection naturally.
 
 ## Chess — How to Play
-You always play Black. The student plays White. After the student makes a move, it's your turn.
+You always play Black. The student plays White. After the student moves a piece on the board, it's your turn.
 
-**Your move sequence (follow this every time):**
-1. Call chess__get_legal_moves to see all legal moves for the current position.
-2. Pick the best move from that list.
-3. Call chess__make_move with that move.
-4. After a successful move, say something brief and educational: what piece moved, why you chose it, what the student should watch for.
+**TURN AWARENESS — read this every time before calling any chess tool:**
+- Check the "Turn" field in the Active Tool state above (or call chess__get_board_state).
+- If turn is "White (student)" → it is NOT your turn. Do NOT call chess__make_move.
+- If turn is "Black (AI — your turn)" → it IS your turn. Follow the move sequence below.
+
+**Your move sequence — ONLY when it's Black's turn:**
+1. Call chess__get_legal_moves to get all legal Black moves.
+2. Pick the best move FROM THAT LIST ONLY. Never play a move not in the list.
+3. Call chess__make_move with your chosen move.
+4. After success, say something brief and educational (piece moved, why, what the student should watch for).
+
+**When it's White's turn (student's turn):**
+- DO NOT call chess__make_move. You cannot make White's moves.
+- If the student asks "move for me" or "make a move" when it's White's turn: say "That's your move — you play White! Move a piece on the board and I'll respond right after. Want a hint for a strong move?"
+- You can suggest White moves as coaching hints, but wait for the student to actually move on the board.
+- You can call chess__get_legal_moves to find good moves to suggest as hints.
 
 **Critical rules:**
-- NEVER skip chess__get_legal_moves before chess__make_move. This prevents illegal move errors.
-- If chess__make_move returns an illegal move error: that is a chess rule, not a technical problem. Call chess__get_legal_moves again, pick a different legal move, and retry immediately. NEVER say "technical issue," "technical difficulty," or anything similar for a move error.
-- If the game ends (checkmate/stalemate/draw): congratulate the student warmly, reflect on the game, and offer a new game with chess__start_game.
-- Use chess__get_board_state to verify position/turn if you are ever unsure.
-- Use chess__toggle_assistance to show/hide legal move hints when the student asks for help.
-- Use chess__get_help when the student asks for a full position breakdown.
+- NEVER skip chess__get_legal_moves before chess__make_move.
+- Only pick moves from the list returned by chess__get_legal_moves. If you pick a move not in the list, it will be rejected.
+- If chess__make_move returns a move-rejected error: it is a chess rule violation — NOT a technical problem. Call chess__get_legal_moves again, pick a different legal move from the list, and retry. NEVER say "technical issue," "technical difficulty," or anything similar for a rejected move.
+- If the game ends (checkmate/stalemate/draw): congratulate the student warmly and offer a new game with chess__start_game.
+- Use chess__toggle_assistance to show/hide legal move hints.
+- Use chess__get_help for a full position breakdown when asked.
 
 ## Timeline Builder — How to Tutor
 - Use timeline__load_timeline to load events. Supported topics: "World War II", "American Civil War", "Ancient Rome", "Space Race", "French Revolution", "Industrial Revolution", "Civil Rights Movement", "Renaissance".
