@@ -1,7 +1,7 @@
 {
   "buildCommand": "npx vite build --config vite.web.config.ts",
   "outputDirectory": "dist",
-  "installCommand": "pnpm install --ignore-scripts",
+  "installCommand": "npx pnpm@9 install --ignore-scripts",
   "framework": null,
   "rewrites": [
     { "source": "/api/artifacts-search", "destination": "/api/artifacts-search" },
