@@ -11,6 +11,7 @@
 
 import { tool } from 'ai'
 import { z } from 'zod'
+import type { ToolResultPayload } from '@/packages/plugin-bridge/types'
 import { pluginRegistry } from '@/packages/plugin-bridge'
 import { getActivePluginId, hasActivePlugin, invokePluginTool } from '@/stores/pluginStateStore'
 import { uniqueId } from 'lodash'
@@ -49,8 +50,15 @@ export function buildPluginToolSet(sessionId: string): Record<string, any> {
         execute: async (args: Record<string, unknown>) => {
           const toolCallId = `plugin_${capturedToolName}_${uniqueId()}`
           try {
-            const result = await invokePluginTool(sessionId, toolCallId, capturedToolName, args)
-            return result
+            const payload = await invokePluginTool(sessionId, toolCallId, capturedToolName, args) as ToolResultPayload
+            // Unwrap the ToolResultPayload — the AI SDK must receive the actual data,
+            // not the { toolCallId, result, error } wrapper. Returning the wrapper was
+            // causing the model to see `error: null` and get confused, then give up
+            // instead of making the next tool call (e.g. make_move after get_legal_moves).
+            if (payload.error) {
+              return { error: payload.error, success: false }
+            }
+            return payload.result ?? { success: true }
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err)
             return { error: message, success: false }
