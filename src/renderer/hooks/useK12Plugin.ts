@@ -12,7 +12,7 @@
  * Usage: Mount in the session route when a K-12 plugin is active.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   type AuditLogEntry,
   AuditLogger,
@@ -240,13 +240,17 @@ export function useK12Plugin(
     lastCompletionPayload,
   }
 
-  const actions: K12PluginActions = {
+  // Memoize the actions object so its reference is stable across renders.
+  // Without this, PluginContainer's useEffect (which depends on `actions`) fires
+  // on every render, repeatedly detaching and re-attaching the bridge and risking
+  // dropped postMessages between detach and re-attach.
+  const actions: K12PluginActions = useMemo(() => ({
     launchPlugin,
     dismissPlugin,
     attachIframe,
     detachIframe,
     invokeTool,
-  }
+  }), [launchPlugin, dismissPlugin, attachIframe, detachIframe, invokeTool])
 
   return [state, actions]
 }

@@ -18,6 +18,7 @@ import { buildK12SystemPrompt, createEmpty } from '@/stores/sessionActions'
 import { updateSessionWithMessages, updateSession } from '@/stores/chatStore'
 import { createMessage } from '@shared/types'
 import { settingsStore } from '@/stores/settingsStore'
+import { lastUsedModelStore } from '@/stores/lastUsedModelStore'
 import { ModelProviderEnum } from '@shared/types/provider'
 
 /** localStorage key used to pass plugin launch intent from K12 dashboard → session route */
@@ -83,32 +84,55 @@ function K12Dashboard() {
     const session = await createEmpty('chat')
     const sessionId = session.id
 
+    // Store plugin intent IMMEDIATELY after getting the sessionId, before any
+    // subsequent awaits. createEmpty → switchCurrentSession navigates to the
+    // session route, and React may commit that navigation and fire useEffect
+    // between any two awaits (since each await yields to the event loop).
+    // If localStorage is set after those awaits, the session route's useEffect
+    // reads an empty key and the plugin never launches.
+    localStorage.setItem(
+      K12_PENDING_PLUGIN_KEY,
+      JSON.stringify({ pluginId: plugin.id, quickStart: plugin.quickStart, sessionId })
+    )
+
     // Override the model: K12 sessions must use a real AI provider (not ChatboxAI).
-    // Pick the first provider that has an API key configured, preferring OpenAI then Claude.
+    // Strategy 1: use the last model the user actually used in any chat (most reliable).
+    // Strategy 2: scan configured providers for one with an API key.
+    const lastUsed = lastUsedModelStore.getState().chat
     const settings = settingsStore.getState().getSettings()
     const providers = settings.providers ?? {}
-    const preferredProviders = [
-      ModelProviderEnum.OpenAI,
-      ModelProviderEnum.Claude,
-      ModelProviderEnum.OpenAIResponses,
-    ] as string[]
-    const firstConfigured = preferredProviders.find((p) => {
-      const key = providers[p]?.apiKey
-      return key && key.trim().length > 0
-    })
-    if (firstConfigured && session.settings?.provider !== firstConfigured) {
-      // Find a sensible default model for the provider
-      const providerModels = providers[firstConfigured]?.models
-      const defaultModelId =
-        providerModels?.[0]?.modelId ??
-        (firstConfigured === ModelProviderEnum.OpenAI ? 'gpt-4o' :
-         firstConfigured === ModelProviderEnum.Claude ? 'claude-sonnet-4-5' : undefined)
-      if (defaultModelId) {
-        await updateSession(sessionId, (s) => ({
-          ...s,
-          settings: { ...s.settings, provider: firstConfigured, modelId: defaultModelId },
-        }))
+
+    let targetProvider: string | undefined
+    let targetModelId: string | undefined
+
+    if (lastUsed?.provider && lastUsed.provider !== ModelProviderEnum.ChatboxAI) {
+      targetProvider = lastUsed.provider
+      targetModelId = lastUsed.modelId
+    } else {
+      const preferredProviders = [
+        ModelProviderEnum.OpenAI,
+        ModelProviderEnum.Claude,
+        ModelProviderEnum.OpenAIResponses,
+        ModelProviderEnum.Gemini,
+      ] as string[]
+      targetProvider = preferredProviders.find((p) => {
+        const key = providers[p]?.apiKey
+        return key && key.trim().length > 0
+      })
+      if (targetProvider) {
+        const providerModels = providers[targetProvider]?.models
+        targetModelId =
+          providerModels?.[0]?.modelId ??
+          (targetProvider === ModelProviderEnum.OpenAI ? 'gpt-4o' :
+           targetProvider === ModelProviderEnum.Claude ? 'claude-sonnet-4-5' : undefined)
       }
+    }
+
+    if (targetProvider && targetModelId && session.settings?.provider !== targetProvider) {
+      await updateSession(sessionId, (s) => ({
+        ...s,
+        settings: { ...s.settings, provider: targetProvider!, modelId: targetModelId! },
+      }))
     }
 
     // Immediately set the K12 TutorMeAI system prompt so the AI has full context
@@ -133,11 +157,6 @@ function K12Dashboard() {
       }
     })
 
-    // Store plugin intent so the session route can launch the plugin on mount
-    localStorage.setItem(
-      K12_PENDING_PLUGIN_KEY,
-      JSON.stringify({ pluginId: plugin.id, quickStart: plugin.quickStart, sessionId })
-    )
     navigate({
       to: '/session/$sessionId',
       params: { sessionId },
